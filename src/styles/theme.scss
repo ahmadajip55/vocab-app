@@ -1,0 +1,28 @@
+// Bootstrap 5.3, themed for the app. Every colour and font comes from here,
+// in light and dark (dark follows the system setting, see src/lib/theme.js).
+
+$primary: #0e7c6b;
+$success: #1b7f47;
+$danger: #b8362b;
+$warning: #d99a14;
+$secondary: #566475;
+
+$font-family-sans-serif: 'Instrument Sans', system-ui, sans-serif;
+$font-family-monospace: 'IBM Plex Mono', ui-monospace, monospace;
+$headings-font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+$headings-font-weight: 700;
+
+// Cards, lists and inputs use the body colour; the page behind them is a
+// shade darker (set in app.css) so cards stand out, in light and dark.
+$body-bg: #ffffff;
+$body-color: #14212f;
+$body-tertiary-bg: #f6f8fb;
+$body-bg-dark: #1a2530;
+$body-color-dark: #e7eef5;
+$body-tertiary-bg-dark: #16202b;
+
+$border-radius: 0.5rem;
+$border-radius-lg: 0.625rem;
+$enable-shadows: false;
+
+@import 'bootstrap/scss/bootstrap';

@@ -1,0 +1,143 @@
+import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { ProgramsContext, VocabularyContext } from './VocabularyContext.js';
+import { createWord } from './model.js';
+import { createProgram, programsReducer } from './programs.js';
+import {
+  STORAGE_KEY,
+  loadPrograms,
+  programWordsKey,
+  removeStoredWords,
+  savePrograms,
+  saveWords,
+} from './storage.js';
+
+const NO_WORDS = [];
+
+/**
+ * Holds every program and its word list for the whole app and saves them to
+ * localStorage: the program list under one key, each program's words under its own.
+ * `storage` can be injected for tests; it defaults to window.localStorage.
+ */
+export function ProgramsProvider({ children, storage }) {
+  const [state, dispatch] = useReducer(programsReducer, undefined, () => loadPrograms(storage));
+  const [persistFailed, setPersistFailed] = useState(false);
+  // What was last written, so a change only rewrites what actually changed.
+  const savedProgramsRef = useRef(null);
+  const savedWordsRef = useRef({}); // programId -> the words array last written
+  const legacyRemovedRef = useRef(false);
+
+  useEffect(() => {
+    let ok = true;
+    if (savedProgramsRef.current !== state.programs) {
+      if (savePrograms(state.programs, storage)) savedProgramsRef.current = state.programs;
+      else ok = false;
+    }
+    const saved = savedWordsRef.current;
+
+    for (const program of state.programs) {
+      const words = state.wordsByProgram[program.id] ?? NO_WORDS;
+      if (saved[program.id] === words) continue;
+      if (saveWords(words, storage, programWordsKey(program.id))) saved[program.id] = words;
+      else ok = false;
+    }
+    for (const id of Object.keys(saved)) {
+      if (state.wordsByProgram[id]) continue;
+      removeStoredWords(programWordsKey(id), storage);
+      delete saved[id];
+    }
+    // The pre-program list now lives inside a program, so the old key can go (once).
+    if (ok && !legacyRemovedRef.current) {
+      removeStoredWords(STORAGE_KEY, storage);
+      legacyRemovedRef.current = true;
+    }
+
+    setPersistFailed(!ok);
+  }, [state, storage]);
+
+  const wordActions = useCallback((programId) => {
+    const run = (action) => dispatch({ type: 'program/words', programId, action });
+    return {
+      addWord(input) {
+        const word = createWord(input);
+        run({ type: 'words/added', words: [word] });
+        return word;
+      },
+      addWords(inputs) {
+        const words = inputs.map((input) => createWord(input));
+        run({ type: 'words/added', words });
+        return words;
+      },
+      updateWord(id, changes) {
+        run({ type: 'word/updated', id, changes });
+      },
+      removeWord(id) {
+        run({ type: 'word/removed', id });
+      },
+      /** source: 'flashcards' or 'quiz'; only quiz answers count towards Passed. */
+      recordResult(id, correct, source = 'flashcards') {
+        run({ type: 'result/recorded', id, correct, source });
+      },
+      resetProgress() {
+        run({ type: 'progress/reset' });
+      },
+      clearAll() {
+        run({ type: 'words/cleared' });
+      },
+    };
+  }, []);
+
+  const programActions = useMemo(
+    () => ({
+      addProgram(name, wordLanguage, levels) {
+        const program = createProgram(name, wordLanguage, levels);
+        dispatch({ type: 'program/added', program });
+        return program;
+      },
+      removeProgram(id) {
+        dispatch({ type: 'program/removed', id });
+      },
+    }),
+    [],
+  );
+
+  const value = useMemo(
+    () => ({ ...state, persistFailed, wordActions, ...programActions }),
+    [state, persistFailed, wordActions, programActions],
+  );
+
+  return <ProgramsContext.Provider value={value}>{children}</ProgramsContext.Provider>;
+}
+
+/**
+ * Makes one program the word list seen by useVocabulary() below it.
+ * Renders `fallback` when the program does not exist.
+ */
+export function ProgramScope({ programId, children, fallback = null }) {
+  const { programs, wordsByProgram, persistFailed, wordActions } = useProgramsContext();
+  const program = programs.find((item) => item.id === programId) ?? null;
+  const words = wordsByProgram[programId] ?? NO_WORDS;
+  const wordLanguage = program?.wordLanguage;
+  const actions = useMemo(() => {
+    const base = wordActions(programId);
+    // New words are read in the program's language from the start (e.g. romaji -> kana).
+    return {
+      ...base,
+      addWord: (input) => base.addWord({ ...input, wordLanguage }),
+      addWords: (inputs) => base.addWords(inputs.map((input) => ({ ...input, wordLanguage }))),
+    };
+  }, [wordActions, programId, wordLanguage]);
+
+  const value = useMemo(
+    () => ({ program, words, persistFailed, ...actions }),
+    [program, words, persistFailed, actions],
+  );
+
+  if (!program) return fallback;
+  return <VocabularyContext.Provider value={value}>{children}</VocabularyContext.Provider>;
+}
+
+function useProgramsContext() {
+  const context = useContext(ProgramsContext);
+  if (!context) throw new Error('ProgramScope must be used inside <ProgramsProvider>.');
+  return context;
+}

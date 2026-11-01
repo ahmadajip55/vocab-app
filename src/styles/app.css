@@ -1,0 +1,99 @@
+/*
+ * What Bootstrap does not provide. Everything else is Bootstrap classes in the
+ * components. Colours come from Bootstrap's variables so dark mode follows.
+ */
+:root {
+  --app-page-bg: #e8edf3; /* behind the cards */
+  --app-mark: #ffe27a; /* highlighter behind the word on a flashcard */
+  --app-shadow: rgba(20, 33, 47, 0.45);
+}
+[data-bs-theme='dark'] {
+  --app-page-bg: #0d141c;
+  --app-mark: #5e4f14;
+  --app-shadow: rgba(0, 0, 0, 0.7);
+}
+
+body {
+  background-color: var(--app-page-bg);
+}
+
+.app-container {
+  max-width: 960px;
+  /* Installed on a phone with a notch: keep content out of the rounded corners. */
+  padding-left: max(var(--bs-gutter-x, 0.75rem) * 0.5 + 4px, env(safe-area-inset-left));
+  padding-right: max(var(--bs-gutter-x, 0.75rem) * 0.5 + 4px, env(safe-area-inset-right));
+}
+.app-navbar {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+  /* Menu links in the brand colour, as before the hamburger menu. */
+  --bs-navbar-color: var(--bs-link-color);
+  --bs-navbar-hover-color: var(--bs-link-hover-color);
+}
+/* navbar-nav would otherwise darken the text of the active pill. */
+.app-navbar .nav-pills .nav-link.active {
+  color: var(--bs-nav-pills-link-active-color);
+}
+.font-display {
+  font-family: var(--bs-headings-font-family, 'Bricolage Grotesque', system-ui, sans-serif);
+}
+.text-label {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+.border-dashed {
+  border-style: dashed !important;
+}
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(var(--app-mark) 0 25%, var(--bs-primary) 25%);
+}
+.skip-link:focus {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 1080;
+}
+
+/* Small progress bars next to a word (mastery, quiz). */
+.mini-progress {
+  width: 56px;
+  height: 8px;
+}
+.mini-count {
+  min-width: 4.5ch;
+}
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+}
+
+/* Kana reading and romaji under a Japanese word (flashcards, quiz). */
+.jp-reading {
+  display: block;
+  font-family: var(--bs-body-font-family);
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--bs-secondary-color);
+}
+
+.quiz-prompt {
+  font-size: clamp(1.9rem, 7vw, 2.8rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
