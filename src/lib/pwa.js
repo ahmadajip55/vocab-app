@@ -1,9 +1,10 @@
-/** Register the service worker (public/sw.js) in production builds, so the app installs and works offline. */
+import { registerSW } from 'virtual:pwa-register';
+
+/**
+ * Register the service worker made by vite-plugin-pwa, so the app installs and
+ * works offline. Production builds only; a new version is applied automatically.
+ */
 export function registerServiceWorker() {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {
-      // Without it the app still works, just not offline.
-    });
-  });
+  if (!import.meta.env.PROD) return;
+  registerSW({ immediate: true });
 }

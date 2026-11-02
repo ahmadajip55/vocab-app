@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useInstallPrompt } from '../hooks/useInstallPrompt.js';
+import { AppLoader } from './AppLoader.jsx';
 import { usePrograms } from '../hooks/usePrograms.js';
 
 const NAV_ITEMS = [
@@ -15,6 +17,7 @@ export function AppShell() {
   // Below the md breakpoint the menu sits behind a hamburger button; wider screens always show it.
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
+  const { canInstall, install } = useInstallPrompt();
 
   useEffect(() => {
     setMenuOpen(false); // a new page closes the menu
@@ -26,9 +29,9 @@ export function AppShell() {
         Skip to content
       </a>
       <header className="navbar navbar-expand-md bg-body-tertiary border-bottom app-navbar">
-        <div className="container app-container">
+        <div className="container-fluid app-container">
           <NavLink to="/" className="navbar-brand d-inline-flex align-items-center gap-2 font-display fw-bold" aria-label="Vocab Cards, go home">
-            <span className="brand-mark" aria-hidden="true" />
+            <img className="brand-logo" src="/favicon.svg" alt="" width="32" height="32" />
             Vocab Cards
           </NavLink>
           <button
@@ -51,18 +54,28 @@ export function AppShell() {
                   </NavLink>
                 </li>
               ))}
+              {canInstall ? (
+                <li className="nav-item ms-md-2">
+                  <button type="button" className="btn btn-primary btn-sm my-1 px-3" onClick={install}>
+                    Install app
+                  </button>
+                </li>
+              ) : null}
             </ul>
           </nav>
         </div>
       </header>
-      <main id="main" className="container app-container vstack gap-4 py-4 pb-5">
+      <main id="main" className="container-fluid app-container vstack gap-4 py-4 pb-5">
         {persistFailed ? (
           <p className="alert alert-warning mb-0" role="status">
             Browser storage is unavailable, so your programs and words will disappear when the tab closes. Export to Excel from each
             program's Words page to keep a copy.
           </p>
         ) : null}
-        <Outlet />
+        {/* Pages load on demand; the header stays while one does. */}
+        <Suspense fallback={<AppLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
     </>
   );

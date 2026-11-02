@@ -4,24 +4,54 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Latihan kosakata dengan kartu belajar dan kuis. Tambah kata manual atau impor dari Excel." />
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="theme-color" content="#0e7c6b" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Vocab Cards" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    />
     <title>Vocab Cards</title>
+    <script>
+      // Dark or light before the first paint (src/lib/theme.js keeps it in sync afterwards).
+      document.documentElement.setAttribute(
+        'data-bs-theme',
+        window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+      );
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        App shell: shown at once, while the JavaScript loads. React replaces it
+        with the same header (src/components/AppShell.jsx), so keep the two alike.
+      -->
+      <header class="navbar navbar-expand-md bg-body-tertiary border-bottom app-navbar">
+        <div class="container-fluid app-container">
+          <a href="/" class="navbar-brand d-inline-flex align-items-center gap-2 font-display fw-bold" aria-label="Vocab Cards, go home">
+            <img class="brand-logo" src="/favicon.svg" alt="" width="32" height="32" />
+            Vocab Cards
+          </a>
+          <span class="navbar-toggler" aria-hidden="true"><span class="navbar-toggler-icon"></span></span>
+          <nav class="collapse navbar-collapse justify-content-md-end" aria-label="Main menu">
+            <ul class="navbar-nav nav-pills gap-1 pt-2 pb-1 py-md-0">
+              <li class="nav-item"><a href="/" class="nav-link fw-semibold px-3">Home</a></li>
+              <li class="nav-item"><a href="/words" class="nav-link fw-semibold px-3">Words</a></li>
+              <li class="nav-item"><a href="/import" class="nav-link fw-semibold px-3">Import</a></li>
+              <li class="nav-item"><a href="/flashcards" class="nav-link fw-semibold px-3">Flashcards</a></li>
+              <li class="nav-item"><a href="/quiz" class="nav-link fw-semibold px-3">Quiz</a></li>
+            </ul>
+          </nav>
+        </div>
+      </header>
+      <main class="container-fluid app-container py-4">
+        <!-- Same markup as src/components/AppLoader.jsx -->
+        <div class="app-loader" role="status" aria-live="polite">
+          <div class="app-loader__cards" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span class="app-loader__label">Loading your cards…</span>
+        </div>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

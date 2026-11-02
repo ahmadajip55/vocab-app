@@ -17,11 +17,17 @@ body {
   background-color: var(--app-page-bg);
 }
 
+/* The app uses the full width of the screen; only the side padding grows on large screens. */
 .app-container {
-  max-width: 960px;
+  --app-side: 1rem;
   /* Installed on a phone with a notch: keep content out of the rounded corners. */
-  padding-left: max(var(--bs-gutter-x, 0.75rem) * 0.5 + 4px, env(safe-area-inset-left));
-  padding-right: max(var(--bs-gutter-x, 0.75rem) * 0.5 + 4px, env(safe-area-inset-right));
+  padding-left: max(var(--app-side), env(safe-area-inset-left));
+  padding-right: max(var(--app-side), env(safe-area-inset-right));
+}
+@media (min-width: 992px) {
+  .app-container {
+    --app-side: 2rem;
+  }
 }
 .app-navbar {
   padding-top: max(0.5rem, env(safe-area-inset-top));
@@ -46,11 +52,10 @@ body {
 .border-dashed {
   border-style: dashed !important;
 }
-.brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(var(--app-mark) 0 25%, var(--bs-primary) 25%);
+.brand-logo {
+  display: block;
+  width: 32px;
+  height: 32px;
 }
 .skip-link:focus {
   position: absolute;
@@ -95,5 +100,93 @@ body {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Loading indicator (src/components/AppLoader.jsx, and the shell in index.html):
+ * three vocabulary cards dealt one after another. Only transform and opacity
+ * animate, so it runs off the main thread and never moves the layout.
+ */
+.app-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  min-height: 40vh;
+  color: var(--bs-secondary-color);
+}
+.app-loader__cards {
+  position: relative;
+  width: 132px;
+  height: 78px;
+}
+.app-loader__cards span {
+  position: absolute;
+  top: 12px;
+  left: 44px;
+  width: 44px;
+  height: 58px;
+  border-radius: 9px;
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0 10px 18px -10px var(--app-shadow);
+  animation: app-loader-deal 1.5s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+/* The word (green) and its highlighter stroke (yellow) on each card. */
+.app-loader__cards span::before,
+.app-loader__cards span::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  border-radius: 4px;
+}
+.app-loader__cards span::before {
+  top: 17px;
+  width: 26px;
+  height: 8px;
+  background: var(--app-mark);
+}
+.app-loader__cards span::after {
+  top: 12px;
+  width: 22px;
+  height: 7px;
+  background: var(--bs-primary);
+}
+.app-loader__cards span:nth-child(1) {
+  --from: -40px;
+  --tilt: -12deg;
+}
+.app-loader__cards span:nth-child(2) {
+  --from: 0px;
+  --tilt: 0deg;
+  animation-delay: 0.18s;
+}
+.app-loader__cards span:nth-child(3) {
+  --from: 40px;
+  --tilt: 12deg;
+  animation-delay: 0.36s;
+}
+@keyframes app-loader-deal {
+  0%,
+  100% {
+    transform: translateX(var(--from)) translateY(0) rotate(var(--tilt));
+    opacity: 0.55;
+  }
+  45% {
+    transform: translateX(var(--from)) translateY(-12px) rotate(calc(var(--tilt) * -0.5));
+    opacity: 1;
+  }
+}
+.app-loader__label {
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-loader__cards span {
+    animation: none;
+    opacity: 1;
+    transform: translateX(var(--from)) rotate(var(--tilt));
   }
 }

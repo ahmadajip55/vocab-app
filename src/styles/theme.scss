@@ -1,5 +1,8 @@
 // Bootstrap 5.3, themed for the app. Every colour and font comes from here,
 // in light and dark (dark follows the system setting, see src/lib/theme.js).
+//
+// Only the Bootstrap parts the app uses are imported, so the CSS that blocks
+// the first paint stays small. Using a new component? Add its partial below.
 
 $primary: #0e7c6b;
 $success: #1b7f47;
@@ -7,9 +10,10 @@ $danger: #b8362b;
 $warning: #d99a14;
 $secondary: #566475;
 
-$font-family-sans-serif: 'Instrument Sans', system-ui, sans-serif;
+// Fonts are bundled with the app (@fontsource, imported in main.jsx), not loaded from Google.
+$font-family-sans-serif: 'Instrument Sans Variable', system-ui, sans-serif;
 $font-family-monospace: 'IBM Plex Mono', ui-monospace, monospace;
-$headings-font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+$headings-font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif;
 $headings-font-weight: 700;
 
 // Cards, lists and inputs use the body colour; the page behind them is a
@@ -25,4 +29,35 @@ $border-radius: 0.5rem;
 $border-radius-lg: 0.625rem;
 $enable-shadows: false;
 
-@import 'bootstrap/scss/bootstrap';
+// Configuration
+@import 'bootstrap/scss/functions';
+@import 'bootstrap/scss/variables';
+@import 'bootstrap/scss/variables-dark';
+@import 'bootstrap/scss/maps';
+@import 'bootstrap/scss/mixins';
+@import 'bootstrap/scss/utilities';
+
+// Layout and content
+@import 'bootstrap/scss/root';
+@import 'bootstrap/scss/reboot';
+@import 'bootstrap/scss/type';
+@import 'bootstrap/scss/containers';
+@import 'bootstrap/scss/grid';
+@import 'bootstrap/scss/tables';
+@import 'bootstrap/scss/forms';
+
+// Components used by the app
+@import 'bootstrap/scss/buttons';
+@import 'bootstrap/scss/transitions'; // .collapse, for the hamburger menu
+@import 'bootstrap/scss/nav';
+@import 'bootstrap/scss/navbar';
+@import 'bootstrap/scss/card';
+@import 'bootstrap/scss/pagination';
+@import 'bootstrap/scss/badge';
+@import 'bootstrap/scss/alert';
+@import 'bootstrap/scss/progress';
+@import 'bootstrap/scss/list-group';
+
+// Helpers and utility classes
+@import 'bootstrap/scss/helpers';
+@import 'bootstrap/scss/utilities/api';
