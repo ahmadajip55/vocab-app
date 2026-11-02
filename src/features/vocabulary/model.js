@@ -138,7 +138,8 @@ export function validateWordInput(input) {
       errors[field] = `Maksimal ${max} karakter.`;
     }
   }
-  if (cleanText(input.meaning).length > LIMITS.meaning) {
+  if (!cleanText(input.meaning)) errors.meaning = 'Isi arti terlebih dahulu.';
+  else if (cleanText(input.meaning).length > LIMITS.meaning) {
     errors.meaning = `Maksimal ${LIMITS.meaning} karakter.`;
   }
   return errors;

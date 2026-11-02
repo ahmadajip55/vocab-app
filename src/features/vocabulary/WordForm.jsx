@@ -192,6 +192,7 @@ export function WordForm({
       romaji: language.code === 'ja' ? (readingsRef.current[term] ?? kanaToRomaji(term)) : '',
     };
     const nextErrors = validateWordInput(normalizedValues);
+    if (nextErrors.meaning && aiLoading) nextErrors.meaning = 'The meaning is still being looked up. Wait a moment, then try again.';
     if (!nextErrors.term) {
       const duplicate = findDuplicate?.(normalizedValues.term, normalizedValues.meaningLanguage);
       if (duplicate) {
@@ -281,7 +282,7 @@ export function WordForm({
             value={values.meaning}
             onChange={change('meaning')}
             error={errors.meaning}
-            hint="Optional. If blank, it is filled in automatically with a free translator."
+            hint="Required. Type it, or wait for it to be filled in automatically with a free translator."
             autoComplete="off"
             placeholder="e.g. persuade, convince"
           />

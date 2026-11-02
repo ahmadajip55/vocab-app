@@ -105,15 +105,26 @@ describe('createWord', () => {
 
 describe('validateWordInput', () => {
   it('should require a word when the word is blank', () => {
-    const input = { term: ' ', meaning: '' };
+    const input = { term: ' ', meaning: 'b' };
 
     const errors = validateWordInput(input);
 
     expect(Object.keys(errors)).toEqual(['term']);
   });
 
-  it('should allow it when the meaning is blank', () => {
-    const input = { term: 'a', meaning: '' };
+  it.each([
+    ['empty', ''],
+    ['only spaces', '   '],
+  ])('should require a meaning when the meaning is %s', (_, meaning) => {
+    const input = { term: 'a', meaning };
+
+    const errors = validateWordInput(input);
+
+    expect(errors).toEqual({ meaning: 'Isi arti terlebih dahulu.' });
+  });
+
+  it('should accept the word when it has a word and a meaning', () => {
+    const input = { term: 'a', meaning: 'b' };
 
     const errors = validateWordInput(input);
 
