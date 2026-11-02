@@ -2,7 +2,7 @@ import { shuffle } from '../../lib/random.js';
 import { normalizeText } from '../../lib/text.js';
 import { expandAcceptedAnswers } from './checkAnswer.js';
 
-export const OPTION_COUNT = 4;
+const OPTION_COUNT = 4;
 
 function pickSide(word, direction) {
   return direction === 'term-to-meaning'
@@ -10,7 +10,12 @@ function pickSide(word, direction) {
     : { prompt: word.meaning, answer: word.term };
 }
 
+/** The fields needed to show a Japanese word's kana reading and romaji. */
+const readingOf = (word) => ({ id: word.id, term: word.term, wordLanguage: word.wordLanguage, romaji: word.romaji ?? '' });
+
+/** Options are words when the answer is the word, so each can show its reading (Japanese). */
 function buildOptions(word, answer, direction, distractorPool, rng) {
+  const withWord = (candidate) => (direction === 'meaning-to-term' ? { word: readingOf(candidate) } : {});
   const answerKey = normalizeText(answer);
   const usedKeys = new Set([answerKey]);
   const distractors = [];
@@ -21,13 +26,13 @@ function buildOptions(word, answer, direction, distractorPool, rng) {
     const key = normalizeText(text);
     if (!key || usedKeys.has(key)) continue;
     usedKeys.add(key);
-    distractors.push(text);
+    distractors.push({ text, ...withWord(candidate) });
     if (distractors.length === OPTION_COUNT - 1) break;
   }
 
   const options = [
-    { text: answer, correct: true },
-    ...distractors.map((text) => ({ text, correct: false })),
+    { text: answer, correct: true, ...withWord(word) },
+    ...distractors.map((option) => ({ ...option, correct: false })),
   ];
   return shuffle(options, rng).map((option, index) => ({ id: `o${index}`, ...option }));
 }
@@ -60,7 +65,7 @@ function buildQuestion(word, { direction, type, distractorPool }, rng) {
     termLanguage: word.wordLanguage ?? 'en',
     meaningLanguage: word.meaningLanguage,
     // The word itself, for its kana reading and romaji in a Japanese quiz.
-    word: { id: word.id, term: word.term, wordLanguage: word.wordLanguage, romaji: word.romaji ?? '' },
+    word: readingOf(word),
   };
 }
 

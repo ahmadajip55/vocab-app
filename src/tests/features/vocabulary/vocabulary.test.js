@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import {
   DEFAULT_TARGETS,
   LANGUAGE_OPTIONS,
@@ -45,7 +45,7 @@ function fakeStorage(initial = {}) {
 }
 
 describe('createWord', () => {
-  test('trims the fields, keeps the languages and starts with no progress', () => {
+  it('should trim the fields, keep the languages and start with no progress when a word is created', () => {
     const input = { term: '  hello  ', meaning: ' halo ', wordLanguage: 'ja', meaningLanguage: 'en' };
 
     const created = createWord(input);
@@ -56,37 +56,37 @@ describe('createWord', () => {
     expect(created.id).toBeTruthy();
   });
 
-  test.each([
+  it.each([
     ['  persuade ', 'Persuade'],
     ["it's well-known", "It's Well-Known"],
-  ])('writes the word %p in Title Case: %p', (term, expected) => {
+  ])('should write %p as %p when the word is created', (term, expected) => {
     const created = createWord({ term });
 
     expect(created.term).toBe(expected);
   });
 
-  test.each([
+  it.each([
     ['membujuk, MEYAKINKAN', 'Membujuk, Meyakinkan'],
     ['terima kasih (banyak)', 'Terima Kasih (Banyak)'],
-  ])('writes the meaning %p in Title Case: %p', (meaning, expected) => {
+  ])('should write the meaning %p as %p when the word is created', (meaning, expected) => {
     const created = createWord({ term: 'x', meaning });
 
     expect(created.meaning).toBe(expected);
   });
 
-  test.each([
+  it.each([
     ['romaji', 'watashi', 'わたし'],
     ['upper-case romaji (not katakana)', 'MIGI', 'みぎ'],
     ['kanji', '日本', '日本'],
     ['katakana', 'コーヒー', 'コーヒー'],
-  ])('in Japanese, keeps %s as kana or as typed: %p -> %p', (_, term, expected) => {
+  ])('should keep %s as kana or as typed (%p -> %p) when the word is Japanese', (_, term, expected) => {
     const created = createWord({ term, wordLanguage: 'ja' });
 
     expect(created.term).toBe(expected);
     expect(created.wordLanguage).toBe('ja');
   });
 
-  test('reads Latin letters as English unless told otherwise', () => {
+  it('should read Latin letters as English when no language is given', () => {
     const input = { term: 'agenda', meaning: 'agenda' };
 
     const created = createWord(input);
@@ -94,7 +94,7 @@ describe('createWord', () => {
     expect([created.term, created.wordLanguage]).toEqual(['Agenda', 'en']);
   });
 
-  test('recognises imported kanji without a language column', () => {
+  it('should recognise kanji when an imported word has no language', () => {
     const input = { term: '日本語', meaning: 'bahasa Jepang' };
 
     const created = createWord(input);
@@ -104,7 +104,7 @@ describe('createWord', () => {
 });
 
 describe('validateWordInput', () => {
-  test('requires a word', () => {
+  it('should require a word when the word is blank', () => {
     const input = { term: ' ', meaning: '' };
 
     const errors = validateWordInput(input);
@@ -112,7 +112,7 @@ describe('validateWordInput', () => {
     expect(Object.keys(errors)).toEqual(['term']);
   });
 
-  test('allows a blank meaning', () => {
+  it('should allow it when the meaning is blank', () => {
     const input = { term: 'a', meaning: '' };
 
     const errors = validateWordInput(input);
@@ -120,7 +120,7 @@ describe('validateWordInput', () => {
     expect(errors).toEqual({});
   });
 
-  test('limits the meaning to 400 characters', () => {
+  it('should refuse it when the meaning is over 400 characters', () => {
     const input = { term: 'a', meaning: 'x'.repeat(401) };
 
     const errors = validateWordInput(input);
@@ -128,7 +128,7 @@ describe('validateWordInput', () => {
     expect(errors.meaning).toBe('Maksimal 400 karakter.');
   });
 
-  test('limits the word to 120 characters', () => {
+  it('should refuse it when the word is over 120 characters', () => {
     const input = { term: 'a'.repeat(121), meaning: 'b' };
 
     const errors = validateWordInput(input);
@@ -140,11 +140,11 @@ describe('validateWordInput', () => {
 describe('findByTerm', () => {
   const cafe = word('Café', 'kafe');
 
-  test.each([
-    ['ignores case and accents', 'cafe', undefined, cafe],
-    ['skips the word being edited', 'cafe', cafe.id, undefined],
-    ['finds nothing for another word', 'tea', undefined, undefined],
-  ])('%s', (_, term, ignoreId, expected) => {
+  it.each([
+    ['the term differs only in case and accents', 'cafe', undefined, cafe],
+    ['the only match is the word being edited', 'cafe', cafe.id, undefined],
+    ['the term is another word', 'tea', undefined, undefined],
+  ])('should return the expected word when %s', (_, term, ignoreId, expected) => {
     const words = [cafe];
 
     const found = findByTerm(words, term, ignoreId);
@@ -152,16 +152,26 @@ describe('findByTerm', () => {
     expect(found).toBe(expected);
   });
 
+  it('should treat them as different words when the words are mada (まだ) and mata (また)', () => {
+    const mata = createWord({ term: 'mata', wordLanguage: 'ja' });
+    const words = [mata];
+
+    const found = findByTerm(words, createWord({ term: 'mada', wordLanguage: 'ja' }).term);
+
+    expect(mata.term).toBe('また');
+    expect(found).toBeUndefined();
+  });
+
   describe('with one entry per meaning language', () => {
     const indonesian = word('Café', 'kafe', { meaningLanguage: 'id' });
     const english = word('cafe', 'coffee shop', { meaningLanguage: 'en' });
 
-    test.each([
+    it.each([
       ['id', undefined, indonesian],
       ['en', undefined, english],
       ['ja', undefined, undefined],
       ['en', english.id, undefined], // editing that entry itself
-    ])('meaning language %p (ignoring %p) finds the matching entry', (meaningLanguage, ignoreId, expected) => {
+    ])('should find the matching entry when the meaning language is %p (ignoring %p)', (meaningLanguage, ignoreId, expected) => {
       const words = [indonesian, english];
 
       const found = findByTerm(words, 'café', ignoreId, meaningLanguage);
@@ -172,7 +182,7 @@ describe('findByTerm', () => {
 });
 
 describe('groupByTerm', () => {
-  test('shows one row per term with every meaning entry inside', () => {
+  it('should show one row per term with every meaning inside when a term has several entries', () => {
     const book = word('book', 'buku', { meaningLanguage: 'id' });
     const pen = word('pen', 'pena', { meaningLanguage: 'id' });
     const livre = word('Book', 'livre', { meaningLanguage: 'fr' });
@@ -183,7 +193,7 @@ describe('groupByTerm', () => {
     expect(groups[0].words).toEqual([book, livre]);
   });
 
-  test('is empty for no words', () => {
+  it('should return an empty list when there are no words', () => {
     const words = [];
 
     const groups = groupByTerm(words);
@@ -193,14 +203,14 @@ describe('groupByTerm', () => {
 });
 
 describe('detectWordLanguage', () => {
-  test.each([
+  it.each([
     ['日本語', undefined, 'ja'],
     ['コーヒー', undefined, 'ja'],
     ['にほん', undefined, 'ja'],
     ['agenda', undefined, 'en'], // Latin letters never turn into Japanese by accident
     ['watashi', undefined, 'en'],
     ['hello', 'es', 'es'],
-  ])('reads the script of %p (fallback %p): %p', (term, fallback, expected) => {
+  ])('should read the script of %p (fallback %p) as %p when the language is detected', (term, fallback, expected) => {
     const language = detectWordLanguage(term, fallback);
 
     expect(language).toBe(expected);
@@ -208,13 +218,13 @@ describe('detectWordLanguage', () => {
 });
 
 describe('toJapaneseReading', () => {
-  test.each([
+  it.each([
     ['watashi', 'わたし'],
     ['konnichiwa', 'こんにちわ'],
     ['nomimono', 'のみもの'],
     ['こんばんは', 'こんばんは'],
     ['hello', 'hello'], // not fully convertible: kept as it is
-  ])('%p reads as %p', (text, expected) => {
+  ])('should read %p as %p when it is converted', (text, expected) => {
     const reading = toJapaneseReading(text);
 
     expect(reading).toBe(expected);
@@ -228,11 +238,11 @@ describe('getWordSuggestions', () => {
     word('apple', 'apel', { wordLanguage: 'en' }),
   ];
 
-  test.each([
+  it.each([
     ['wa', 'ja', ['わたし']],
     ['ar', 'ja', ['ありがとう']],
     ['ap', 'en', ['Apple']],
-  ])('%p in %s suggests %j', (query, language, expected) => {
+  ])('should turn %p in %s into the suggestions %j when the user types', (query, language, expected) => {
     const suggestions = getWordSuggestions(words, query, language);
 
     expect(suggestions).toEqual(expected);
@@ -240,14 +250,14 @@ describe('getWordSuggestions', () => {
 });
 
 describe('mastery', () => {
-  test('the default mastered target is 100', () => {
+  it('should be 100 when the program has no mastered target', () => {
     const targets = targetsOf(undefined);
 
     expect(targets.mastered).toBe(100);
     expect(DEFAULT_TARGETS.mastered).toBe(100);
   });
 
-  test('99 correct answers in a row are one short of mastered', () => {
+  it('should not be mastered when 99 answers in a row are correct', () => {
     const start = word('a', 'b');
 
     const result = answered(start, 99, true);
@@ -256,7 +266,7 @@ describe('mastery', () => {
     expect(getStatus(result)).toBe('learning');
   });
 
-  test('stops at 100 and counts every attempt', () => {
+  it('should stop at 100 and count every attempt when answers keep being correct', () => {
     const start = word('a', 'b');
 
     const result = answered(start, 104, true);
@@ -266,7 +276,7 @@ describe('mastery', () => {
     expect(getStatus(result)).toBe('mastered');
   });
 
-  test('a wrong answer resets mastery to 0, keeping the correct count', () => {
+  it('should reset mastery to 0 and keep the correct count when an answer is wrong', () => {
     const mastered = answered(word('a', 'b'), 104, true);
 
     const result = applyResult(mastered, false);
@@ -276,7 +286,7 @@ describe('mastery', () => {
     expect(getStatus(result)).toBe('weak');
   });
 
-  test('summarizeWords counts each status', () => {
+  it('should count each status when words are summarized', () => {
     const words = [
       word('a', 'b'),
       word('c', 'd', { attempts: 2, mastery: 1 }),
@@ -291,7 +301,7 @@ describe('mastery', () => {
 });
 
 describe('learning targets', () => {
-  test.each([
+  it.each([
     [5, 5],
     ['20', 20],
     [0, 1],
@@ -299,17 +309,19 @@ describe('learning targets', () => {
     [2.5, 100],
     ['abc', 100],
     [undefined, 100],
-  ])('sanitizeTarget(%p) is %p', (value, expected) => {
-    expect(sanitizeTarget(value)).toBe(expected);
+  ])('should turn %p into %p when a target is sanitized', (value, expected) => {
+    const target = sanitizeTarget(value);
+
+    expect(target).toBe(expected);
   });
 
-  test('targetsOf reads the program targets', () => {
+  it('should read the program targets when they are set', () => {
     const targets = targetsOf({ masteredLevel: 10, passedLevel: 3 });
 
     expect(targets).toEqual({ mastered: 10, passed: 3 });
   });
 
-  test('mastery stops at a custom mastered target', () => {
+  it('should stop at the target when the mastered target is custom', () => {
     const targets = { mastered: 5, passed: 3 };
 
     const custom = [...Array(8)].reduce((current) => applyResult(current, true, 'flashcards', targets), word('a', 'b'));
@@ -319,7 +331,7 @@ describe('learning targets', () => {
     expect(getStatus(custom)).toBe('learning');
   });
 
-  test('a custom passed target passes the word sooner', () => {
+  it('should pass the word sooner when the passed target is lower', () => {
     const targets = { mastered: 5, passed: 3 };
     const start = answered(word('a', 'b'), 3, true, 'quiz');
 
@@ -333,14 +345,14 @@ describe('learning targets', () => {
 });
 
 describe('Passed flag', () => {
-  test('the default passed target is 100', () => {
+  it('should be 100 when the program has no passed target', () => {
     const targets = targetsOf({});
 
     expect(targets.passed).toBe(100);
     expect(DEFAULT_TARGETS.passed).toBe(100);
   });
 
-  test('wrong quiz answers and flashcard answers do not count towards it', () => {
+  it('should not count towards Passed when the answer is wrong or from flashcards', () => {
     const start = answered(word('a', 'b'), 99, true, 'quiz');
 
     const result = applyResult(applyResult(start, false, 'quiz'), true, 'flashcards');
@@ -350,7 +362,7 @@ describe('Passed flag', () => {
     expect(result.mastery).toBe(1); // mastery still resets on the wrong answer
   });
 
-  test('the 100th correct quiz answer passes the word', () => {
+  it('should pass the word when the 100th quiz answer is correct', () => {
     const start = answered(word('a', 'b'), 99, true, 'quiz');
 
     const result = applyResult(start, true, 'quiz');
@@ -360,7 +372,7 @@ describe('Passed flag', () => {
     expect(summarizeWords([result, word('c', 'd')]).passed).toBe(1);
   });
 
-  test('resetting progress clears it', () => {
+  it('should clear the Passed count when progress is reset', () => {
     const passed = word('a', 'b', { quizPassed: 100 });
 
     const result = resetProgress(passed);
@@ -368,7 +380,7 @@ describe('Passed flag', () => {
     expect(result.quizPassed).toBe(0);
   });
 
-  test('quizProgressOf sums correct quiz answers, each word counting up to 100', () => {
+  it('should sum correct quiz answers up to 100 per word when quiz progress is counted', () => {
     const words = [
       word('a', 'b', { quizPassed: 150 }), // counts as 100, passed
       word('c', 'd', { quizPassed: 50 }),
@@ -381,7 +393,7 @@ describe('Passed flag', () => {
     expect(progress).toEqual({ passed: 2, total: 4, points: 250, max: 400, percent: 62 });
   });
 
-  test('quizProgressOf is zero for no words', () => {
+  it('should be zero when there are no words', () => {
     const words = [];
 
     const progress = quizProgressOf(words);
@@ -391,7 +403,7 @@ describe('Passed flag', () => {
 });
 
 describe('meaning languages', () => {
-  test('never include the word language itself', () => {
+  it('should never include the word language when meaning languages are offered', () => {
     const wordLanguage = 'ja';
 
     const options = meaningLanguageOptions(wordLanguage);
@@ -400,11 +412,11 @@ describe('meaning languages', () => {
     expect(options).toHaveLength(LANGUAGE_OPTIONS.length - 1);
   });
 
-  test.each([
+  it.each([
     ['the most used one in the program', [word('a', 'b', { meaningLanguage: 'en' })], 'ja', 'en'],
     ['otherwise Indonesian', [], 'ja', 'id'],
     ['or another language for an Indonesian program', [], 'id', 'en'],
-  ])('the default is %s', (_, words, wordLanguage, expected) => {
+  ])('should pick %s when a default meaning language is chosen', (_, words, wordLanguage, expected) => {
     const language = defaultMeaningLanguage(words, wordLanguage);
 
     expect(language).toBe(expected);
@@ -419,7 +431,7 @@ describe('vocabularyReducer', () => {
     return { a, b, state: vocabularyReducer(initialVocabularyState, { type: 'words/added', words: [a, b] }) };
   }
 
-  test('adds words', () => {
+  it('should add them when words are added', () => {
     const words = [word('a', 'b'), word('c', 'd')];
 
     const state = vocabularyReducer(initialVocabularyState, { type: 'words/added', words });
@@ -427,7 +439,7 @@ describe('vocabularyReducer', () => {
     expect(state.words).toHaveLength(2);
   });
 
-  test('updates the editable fields in Title Case, not the progress', () => {
+  it('should update the fields in Title Case but not the progress when a word is edited', () => {
     const { a, state } = twoWords();
 
     const after = vocabularyReducer(state, { type: 'word/updated', id: a.id, changes: { term: 'convince', meaning: '  MEYAKINKAN ', mastery: 3 } });
@@ -436,7 +448,7 @@ describe('vocabularyReducer', () => {
     expect(after.words[0].mastery).toBe(0);
   });
 
-  test('records a flashcard answer', () => {
+  it('should update the progress when a flashcard answer is recorded', () => {
     const { b, state } = twoWords();
 
     const after = vocabularyReducer(state, { type: 'result/recorded', id: b.id, correct: true });
@@ -445,7 +457,7 @@ describe('vocabularyReducer', () => {
     expect(after.words[1].quizPassed).toBe(0); // no source means flashcards
   });
 
-  test('records a quiz answer towards Passed', () => {
+  it('should count towards Passed when a quiz answer is recorded', () => {
     const { b, state } = twoWords();
 
     const after = vocabularyReducer(state, { type: 'result/recorded', id: b.id, correct: true, source: 'quiz' });
@@ -453,7 +465,7 @@ describe('vocabularyReducer', () => {
     expect(after.words[1].quizPassed).toBe(1);
   });
 
-  test('resets the progress of every word', () => {
+  it('should reset every word when progress is reset', () => {
     const { b, state } = twoWords();
     const practised = vocabularyReducer(state, { type: 'result/recorded', id: b.id, correct: true });
 
@@ -462,7 +474,7 @@ describe('vocabularyReducer', () => {
     expect(after.words[1].mastery).toBe(0);
   });
 
-  test('removes a word', () => {
+  it('should remove the word when it is deleted', () => {
     const { a, b, state } = twoWords();
 
     const after = vocabularyReducer(state, { type: 'word/removed', id: a.id });
@@ -470,7 +482,7 @@ describe('vocabularyReducer', () => {
     expect(after.words.map((w) => w.id)).toEqual([b.id]);
   });
 
-  test('clears the list', () => {
+  it('should empty the list when it is cleared', () => {
     const { state } = twoWords();
 
     const after = vocabularyReducer(state, { type: 'words/cleared' });
@@ -478,7 +490,7 @@ describe('vocabularyReducer', () => {
     expect(after.words).toEqual([]);
   });
 
-  test('skipDuplicates drops terms that already exist or repeat', () => {
+  it('should drop existing and repeated terms when skipDuplicates is set', () => {
     const state = { words: [word('Hello', 'halo')] };
 
     const after = vocabularyReducer(state, { type: 'words/added', skipDuplicates: true, words: [word('hello', 'x'), word('new', 'baru'), word('NEW', 'y')] });
@@ -486,7 +498,7 @@ describe('vocabularyReducer', () => {
     expect(after.words.map((w) => w.term)).toEqual(['Hello', 'New']);
   });
 
-  test('ignores unknown actions', () => {
+  it('should ignore the action when it is unknown', () => {
     const state = { words: [word('Hello', 'halo')] };
 
     const after = vocabularyReducer(state, { type: 'unexpected' });
@@ -496,11 +508,11 @@ describe('vocabularyReducer', () => {
 });
 
 describe('termKey', () => {
-  test.each([
+  it.each([
     ['', ''],
     ['  ', ''],
     ['!!!', '!!!'],
-  ])('falls back cleanly for %p', (text, expected) => {
+  ])('should fall back cleanly when the term is %p', (text, expected) => {
     const key = termKey(text);
 
     expect(key).toBe(expected);
@@ -513,7 +525,7 @@ describe('saving and loading words', () => {
     { id: 'w2', term: 'swift', meaning: 'cepat', wordLanguage: 'en', meaningLanguage: 'id', mastery: 0, attempts: 1, correctCount: 0, createdAt: 456 },
   ];
 
-  test('saveWords stores the term, meaning, languages and progress', () => {
+  it('should store the term, meaning, languages and progress when words are saved', () => {
     const storage = fakeStorage();
 
     const saved = saveWords(words, storage);
@@ -525,19 +537,19 @@ describe('saving and loading words', () => {
     ]);
   });
 
-  test('saveWords compresses the list', () => {
+  it('should compress the list when words are saved', () => {
     const storage = fakeStorage();
     const many = Array.from({ length: 200 }, (_, i) => ({ ...words[i % 2], id: `w${i}`, term: `word ${i}` }));
 
     saveWords(many, storage);
-
     const stored = storage.getItem(STORAGE_KEY);
+
     expect(stored.startsWith('lz:')).toBe(true);
     expect(stored.length).toBeLessThan(decodeStored(stored).length / 3);
     expect(loadWords(storage)).toHaveLength(200);
   });
 
-  test('loadWords still reads a list saved as plain JSON', () => {
+  it('should read the list when it was saved as plain JSON', () => {
     const storage = fakeStorage();
     storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, words }));
 
@@ -546,7 +558,7 @@ describe('saving and loading words', () => {
     expect(loaded.map((word) => word.term)).toEqual(['Thrive', 'Swift']);
   });
 
-  test('loadWords returns an empty list for damaged compressed data', () => {
+  it('should return an empty list when the compressed data is damaged', () => {
     const storage = fakeStorage();
     storage.setItem(STORAGE_KEY, 'lz:\u0001garbage');
 
@@ -555,7 +567,7 @@ describe('saving and loading words', () => {
     expect(loaded).toEqual([]);
   });
 
-  test('loadWords restores the clean shape, in Title Case', () => {
+  it('should restore the clean shape in Title Case when words are loaded', () => {
     const storage = fakeStorage();
     saveWords(words, storage);
 
@@ -567,7 +579,7 @@ describe('saving and loading words', () => {
     ]);
   });
 
-  test('the Passed count survives a reload', () => {
+  it('should keep the Passed count when the page is reloaded', () => {
     const storage = fakeStorage();
     saveWords([word('a', 'b', { quizPassed: 100 })], storage);
 
@@ -576,51 +588,57 @@ describe('saving and loading words', () => {
     expect(isPassed(loaded)).toBe(true);
   });
 
-  test.each([
+  it.each([
     ['corrupt data', fakeStorage({ [STORAGE_KEY]: '{not json' })],
     ['no storage', null],
     ['an empty value', { getItem: () => '' }],
     ['a blocked storage', { getItem() { throw new Error('blocked'); } }],
-  ])('loadWords survives %s', (_, storage) => {
+  ])('should not crash when loadWords meets %s', (_, storage) => {
     const loaded = loadWords(storage);
 
     expect(loaded).toEqual([]);
   });
 
-  test.each([
+  it.each([
     ['no storage', null],
     ['a full storage', { setItem() { throw new Error('quota'); } }],
-  ])('saveWords reports failure with %s', (_, storage) => {
+  ])('should report failure when saveWords meets %s', (_, storage) => {
     const saved = saveWords([], storage);
 
     expect(saved).toBe(false);
   });
 
-  test('falls back safely when the browser blocks localStorage itself', () => {
+  describe('with localStorage blocked by the browser', () => {
     // Keep the descriptor rather than the value, so Node's built-in localStorage getter is not read.
-    const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-    Object.defineProperty(globalThis, 'localStorage', {
-      get() {
-        throw new Error('blocked');
-      },
-      configurable: true,
+    let original;
+
+    beforeEach(() => {
+      original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+      Object.defineProperty(globalThis, 'localStorage', {
+        get() {
+          throw new Error('blocked');
+        },
+        configurable: true,
+      });
     });
 
-    try {
+    afterEach(() => {
+      if (original) Object.defineProperty(globalThis, 'localStorage', original);
+      else delete globalThis.localStorage;
+    });
+
+    it('should fall back safely when the browser blocks localStorage itself', () => {
       const loaded = loadWords();
       const saved = saveWords([], undefined);
 
       expect(loaded).toEqual([]);
       expect(saved).toBe(false);
-    } finally {
-      if (original) Object.defineProperty(globalThis, 'localStorage', original);
-      else delete globalThis.localStorage;
-    }
+    });
   });
 });
 
 describe('sanitizeWords', () => {
-  test('discards junk and repairs fields', () => {
+  it('should drop junk and repair fields when the list is damaged', () => {
     const raw = [
       null,
       'x',
@@ -637,7 +655,7 @@ describe('sanitizeWords', () => {
     expect(words[0].id).not.toBe(words[1].id);
   });
 
-  test('reads only a list', () => {
+  it('should return an empty list when the data is not a list', () => {
     const raw = 'nope';
 
     const words = sanitizeWords(raw);
@@ -645,7 +663,7 @@ describe('sanitizeWords', () => {
     expect(words).toEqual([]);
   });
 
-  test('gives a missing creation time a real one', () => {
+  it('should give a real creation time when it is missing', () => {
     const raw = [{ term: 'ok', meaning: 'fine', createdAt: Number.NaN }];
 
     const [repaired] = sanitizeWords(raw);
@@ -653,7 +671,7 @@ describe('sanitizeWords', () => {
     expect(Number.isFinite(repaired.createdAt)).toBe(true);
   });
 
-  test('converts lists saved before Title Case and before the Passed flag', () => {
+  it('should convert the list when it was saved before Title Case and the Passed flag', () => {
     const raw = [{ id: 'x', term: 'selasa', meaning: 'tuesday', wordLanguage: 'id', meaningLanguage: 'en' }];
 
     const [converted] = sanitizeWords(raw);

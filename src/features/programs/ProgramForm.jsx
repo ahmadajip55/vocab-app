@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Button } from '../../components/Button.jsx';
+import { CollapsibleCard } from '../../components/CollapsibleCard.jsx';
 import { CheckboxField, SelectField, TextField } from '../../components/Fields.jsx';
 import { usePrograms } from '../../hooks/usePrograms.js';
 import { DEFAULT_LANGUAGES, LANGUAGE_OPTIONS, TARGET_LIMITS } from '../vocabulary/model.js';
@@ -25,14 +26,12 @@ const targetDraft = (settings) => ({
 /** Creates a program. Only the Home page offers it. It can be shown or hidden; it starts open while there are no programs. */
 export function ProgramForm() {
   const { programs, settings, addProgram } = usePrograms();
-  const [open, setOpen] = useState(() => programs.length === 0);
   const [name, setName] = useState('');
   const [wordLanguage, setWordLanguage] = useState(DEFAULT_LANGUAGES.wordLanguage);
   const [levels, setLevels] = useState([]);
   const [targets, setTargets] = useState(() => targetDraft(settings));
   const [errors, setErrors] = useState({});
   const levelsId = useId();
-  const formId = useId();
 
   const levelOptions = levelOptionsFor(wordLanguage);
   const isJlpt = wordLanguage === 'ja';
@@ -64,16 +63,8 @@ export function ProgramForm() {
   }
 
   return (
-    <section className="card card-body" aria-labelledby={`${formId}-title`}>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <h2 id={`${formId}-title`} className="h5 mb-0">
-          New program
-        </h2>
-        <Button size="small" aria-expanded={open} aria-controls={formId} onClick={() => setOpen((current) => !current)}>
-          {open ? 'Hide' : 'Show'}
-        </Button>
-      </div>
-      <form id={formId} className="mt-3" onSubmit={handleSubmit} noValidate hidden={!open}>
+    <CollapsibleCard title="New program" storageKey="vocab-app:new-program-open" defaultOpen={programs.length === 0}>
+      <form onSubmit={handleSubmit} noValidate aria-label="New program">
         <div className="row g-3">
           <TextField
             className="col-md-6"
@@ -161,6 +152,6 @@ export function ProgramForm() {
           </div>
         </div>
       </form>
-    </section>
+    </CollapsibleCard>
   );
 }

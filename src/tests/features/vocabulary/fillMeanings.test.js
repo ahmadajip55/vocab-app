@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from '@jest/globals';
+import { describe, expect, jest, it } from '@jest/globals';
 import { createWord } from '../../../features/vocabulary/model.js';
 import { fillMissingMeanings } from '../../../features/vocabulary/fillMeanings.js';
 
@@ -13,18 +13,18 @@ function fakeTranslator() {
 }
 
 describe('fillMissingMeanings', () => {
-  test('asks for every blank word in one request; only a word with no answer is retried alone', async () => {
+  it('should ask once for every blank word and retry only the unanswered one when meanings are missing', async () => {
     const fetchImpl = fakeTranslator();
     const words = [word('cat'), word('dog', 'anjing'), word('bird'), word('zzz')];
 
     await fillMissingMeanings(words, undefined, { fetchImpl });
-
     const urls = fetchImpl.mock.calls.map(([url]) => new URL(url));
+
     expect(urls[0].searchParams.getAll('q')).toEqual(['Cat', 'Bird', 'Zzz']);
     expect(urls.slice(1).every((url) => url.searchParams.get('q') === 'Zzz')).toBe(true);
   });
 
-  test('fills the blanks and keeps the saved meanings', async () => {
+  it('should fill the blanks and keep the saved meanings when some words have meanings', async () => {
     const fetchImpl = fakeTranslator();
     const words = [word('cat'), word('dog', 'anjing'), word('bird'), word('zzz')];
 
@@ -33,7 +33,7 @@ describe('fillMissingMeanings', () => {
     expect(filled.map((w) => w.meaning)).toEqual(['Arti Cat', 'Anjing', 'Arti Bird', '']);
   });
 
-  test('reports every meaning found so the caller can save it', async () => {
+  it('should report every meaning found when blanks are filled', async () => {
     const fetchImpl = fakeTranslator();
     const onFound = jest.fn();
     const words = [word('cat'), word('dog', 'anjing'), word('bird'), word('zzz')];
@@ -46,7 +46,7 @@ describe('fillMissingMeanings', () => {
     ]);
   });
 
-  test('requests nothing when every word already has a meaning', async () => {
+  it('should request nothing when every word already has a meaning', async () => {
     const fetchImpl = jest.fn();
     const words = [word('cat', 'kucing')];
 

@@ -1,13 +1,17 @@
+import LZString from 'lz-string';
 import { createId } from '../../lib/id.js';
-import { cleanSettings, sanitizePrograms, sanitizeWords, settlePrograms, toStoredWords } from '../vocabulary/storage.js';
+import { cleanSettings, sanitizePrograms, sanitizeWords, settlePrograms, toStoredProgram, toStoredWords } from '../vocabulary/storage.js';
 
 /**
- * A backup is a .txt file holding JSON: every program with its words and
- * progress, plus the app settings. Restoring one replaces the data on this device.
+ * A backup is a .txt file: every program with its words and progress, plus the
+ * app settings, as JSON compressed with lz-string (Base64, so the file stays plain
+ * ASCII text). Backups saved as plain JSON can still be restored.
+ * Restoring one replaces the data on this device.
  */
 export const BACKUP_FORMAT = 'vocab-cards-backup';
-export const BACKUP_VERSION = 1;
-export const BACKUP_MAX_BYTES = 10 * 1024 * 1024;
+const BACKUP_VERSION = 1;
+export const BACKUP_MAX_BYTES = 50 * 1024 * 1024;
+const COMPRESSED_HEADER = `${BACKUP_FORMAT}:lz:`;
 
 const NOT_A_BACKUP = 'This file is not a Vocab Cards backup.';
 
@@ -18,18 +22,9 @@ export function createBackup({ programs, wordsByProgram, settings }, exportedAt 
     version: BACKUP_VERSION,
     exportedAt: exportedAt.toISOString(),
     settings: cleanSettings(settings),
-    programs: programs.map(({ id, name, wordLanguage, levels, masteredLevel, passedLevel, createdAt }) => ({
-      id,
-      name,
-      wordLanguage,
-      levels,
-      masteredLevel,
-      passedLevel,
-      createdAt,
-      words: toStoredWords(wordsByProgram[id] ?? []),
-    })),
+    programs: programs.map((program) => ({ ...toStoredProgram(program), words: toStoredWords(wordsByProgram[program.id] ?? []) })),
   };
-  return JSON.stringify(backup, null, 2);
+  return COMPRESSED_HEADER + LZString.compressToBase64(JSON.stringify(backup));
 }
 
 /** e.g. "vocab-cards-backup-2026-11-02.txt" (local date). */
@@ -45,7 +40,10 @@ export function backupFileName(date = new Date()) {
 export function parseBackup(text) {
   let raw;
   try {
-    raw = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+    const clean = String(text).replace(/^\uFEFF/, '').trim();
+    raw = JSON.parse(
+      clean.startsWith(COMPRESSED_HEADER) ? LZString.decompressFromBase64(clean.slice(COMPRESSED_HEADER.length)) : clean,
+    );
   } catch {
     throw new Error(NOT_A_BACKUP);
   }

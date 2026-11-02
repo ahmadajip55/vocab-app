@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { createWord } from '../../../features/vocabulary/model.js';
 import { createSeededRng } from '../../../lib/random.js';
 import { checkTypedAnswer, expandAcceptedAnswers } from '../../../features/quiz/checkAnswer.js';
@@ -26,7 +26,7 @@ const next = { type: 'next' };
 const THREE_ANSWERS = [answer('correct'), next, answer('wrong', 'z'), next, answer('close', 'w')];
 
 describe('expandAcceptedAnswers', () => {
-  test('accepts each alternative and all of them together', () => {
+  it('should accept each alternative and all of them together when the answer has several', () => {
     const meaning = 'enggan, berat hati';
 
     const accepted = expandAcceptedAnswers(meaning);
@@ -34,7 +34,7 @@ describe('expandAcceptedAnswers', () => {
     expect([...accepted].sort()).toEqual(['berat hati', 'enggan', 'enggan berat hati'].sort());
   });
 
-  test('accepts the answer with and without the part in parentheses', () => {
+  it('should accept the answer with and without it when part of the answer is in parentheses', () => {
     const meaning = 'meminjam (dari orang lain)';
 
     const accepted = expandAcceptedAnswers(meaning);
@@ -42,10 +42,10 @@ describe('expandAcceptedAnswers', () => {
     expect(accepted).toEqual(expect.arrayContaining(['meminjam', 'meminjam dari orang lain']));
   });
 
-  test.each([
+  it.each([
     ['???', ['???']],
     ['', []],
-  ])('keeps %p as it is', (meaning, expected) => {
+  ])('should keep %p as it is when it has no alternatives', (meaning, expected) => {
     const accepted = expandAcceptedAnswers(meaning);
 
     expect(accepted).toEqual(expected);
@@ -53,13 +53,13 @@ describe('expandAcceptedAnswers', () => {
 });
 
 describe('checkTypedAnswer', () => {
-  test.each([
+  it.each([
     ['Enggan', 'correct'],
     ['  berat   hati ', 'correct'],
     ['engan', 'close'],
     ['senang', 'wrong'],
     ['', 'wrong'],
-  ])('%p is %p', (typed, expected) => {
+  ])('should rate the answer %p as %p when it is checked', (typed, expected) => {
     const accepted = expandAcceptedAnswers('enggan, berat hati');
 
     const result = checkTypedAnswer(typed, accepted);
@@ -67,7 +67,7 @@ describe('checkTypedAnswer', () => {
     expect(result).toBe(expected);
   });
 
-  test('gives short answers no typo tolerance', () => {
+  it('should allow no typo when the answer is short', () => {
     const accepted = expandAcceptedAnswers('apel');
 
     const result = checkTypedAnswer('apal', accepted);
@@ -77,7 +77,34 @@ describe('checkTypedAnswer', () => {
 });
 
 describe('generateQuiz', () => {
-  test('builds one question per word', () => {
+  it('should give each option its word when the quiz asks meaning to word', () => {
+    const japanese = [
+      { ...createWord({ term: '右', meaning: 'kanan', wordLanguage: 'ja' }), romaji: 'migi' },
+      { ...createWord({ term: '左', meaning: 'kiri', wordLanguage: 'ja' }), romaji: 'hidari' },
+      createWord({ term: 'neko', meaning: 'kucing', wordLanguage: 'ja' }),
+      createWord({ term: 'inu', meaning: 'anjing', wordLanguage: 'ja' }),
+    ];
+
+    const expectedWord = (text) => {
+      const word = japanese.find((item) => item.term === text);
+      return { id: word.id, term: word.term, wordLanguage: 'ja', romaji: word.romaji ?? '' };
+    };
+
+    const [question] = generateQuiz(japanese, { count: 1, type: 'choice', direction: 'meaning-to-term' }, createSeededRng(2));
+
+    expect(question.options).toHaveLength(4);
+    expect(question.options.map((option) => option.word)).toEqual(question.options.map((option) => expectedWord(option.text)));
+  });
+
+  it('should give the options no word when the quiz asks word to meaning', () => {
+    const settings = { count: 'all', type: 'choice', direction: 'term-to-meaning' };
+
+    const quiz = generateQuiz(WORDS, settings, createSeededRng(1));
+
+    expect(quiz.flatMap((question) => question.options).some((option) => 'word' in option)).toBe(false);
+  });
+
+  it('should ask one question per word when the count is "all"', () => {
     const settings = { count: 'all', type: 'choice' };
 
     const quiz = generateQuiz(WORDS, settings, createSeededRng(1));
@@ -86,24 +113,22 @@ describe('generateQuiz', () => {
     expect(new Set(quiz.map((q) => q.wordId)).size).toBe(WORDS.length);
   });
 
-  test('gives every choice question four distinct options with one correct answer', () => {
+  it('should give four distinct options with one correct answer when the questions are multiple choice', () => {
     const settings = { count: 'all', type: 'choice' };
 
     const quiz = generateQuiz(WORDS, settings, createSeededRng(1));
 
-    for (const question of quiz) {
-      expect(question.type).toBe('choice');
-      expect(question.options).toHaveLength(4);
-      expect(question.options.filter((option) => option.correct)).toHaveLength(1);
-      expect(question.options.find((option) => option.correct).text).toBe(question.answer);
-      expect(new Set(question.options.map((option) => option.text)).size).toBe(4);
-    }
+    expect(quiz.every((question) => question.type === 'choice')).toBe(true);
+    expect(quiz.map((question) => question.options.length)).toEqual(quiz.map(() => 4));
+    expect(quiz.map((question) => question.options.filter((option) => option.correct).length)).toEqual(quiz.map(() => 1));
+    expect(quiz.map((question) => question.options.find((option) => option.correct).text)).toEqual(quiz.map((question) => question.answer));
+    expect(quiz.map((question) => new Set(question.options.map((option) => option.text)).size)).toEqual(quiz.map(() => 4));
   });
 
-  test.each([
+  it.each([
     ['meaning-to-term', ['Apel', 'Apple']],
     ['term-to-meaning', ['Apple', 'Apel']],
-  ])('direction %s decides the prompt and the answer', (direction, expected) => {
+  ])('should use the matching prompt and answer when the direction is %s', (direction, expected) => {
     const settings = { type: 'typing', direction };
 
     const [question] = generateQuiz([WORDS[0]], settings);
@@ -111,7 +136,7 @@ describe('generateQuiz', () => {
     expect([question.prompt, question.answer]).toEqual(expected);
   });
 
-  test('mixed direction and type use both variants', () => {
+  it('should use both variants when the direction and type are mixed', () => {
     const settings = { count: 'all', direction: 'mixed', type: 'mixed' };
 
     const quiz = generateQuiz(WORDS, settings, createSeededRng(5));
@@ -120,7 +145,7 @@ describe('generateQuiz', () => {
     expect(new Set(quiz.map((q) => q.type)).size).toBe(2);
   });
 
-  test('count "all" asks every word', () => {
+  it('should ask every word when the count is "all"', () => {
     const settings = { count: 'all' };
 
     const quiz = generateQuiz(WORDS, settings);
@@ -128,7 +153,7 @@ describe('generateQuiz', () => {
     expect(quiz).toHaveLength(WORDS.length);
   });
 
-  test('a shorter quiz prefers weak words', () => {
+  it('should prefer weak words when the quiz is shorter than the list', () => {
     const practised = WORDS.map((word, i) => (i < 3 ? { ...word, mastery: 100, attempts: 100 } : word));
 
     const quiz = generateQuiz(practised, { count: 3, type: 'typing' }, createSeededRng(2));
@@ -136,7 +161,7 @@ describe('generateQuiz', () => {
     expect(quiz.map((q) => q.prompt).sort()).toEqual(['Agenda', 'Deadline', 'Reluctant']);
   });
 
-  test('a choice question falls back to typing when there are no alternatives', () => {
+  it('should ask by typing when there are no alternatives for a choice question', () => {
     const words = [WORDS[0]];
 
     const [question] = generateQuiz(words, { type: 'choice' });
@@ -145,15 +170,13 @@ describe('generateQuiz', () => {
     expect(question.options).toBeUndefined();
   });
 
-  test('never shows the same answer text twice as options', () => {
+  it('should never show the same answer twice when options are built', () => {
     const words = [make('a', 'sama'), make('b', 'sama'), make('c', 'sama'), make('d', 'beda')];
 
     const quiz = generateQuiz(words, { count: 'all', type: 'choice' }, createSeededRng(9));
+    const optionTexts = quiz.map((question) => question.options?.map((option) => option.text) ?? []);
 
-    for (const question of quiz) {
-      const texts = question.options?.map((option) => option.text) ?? [];
-      expect(new Set(texts).size).toBe(texts.length);
-    }
+    expect(optionTexts.map((texts) => new Set(texts).size)).toEqual(optionTexts.map((texts) => texts.length));
   });
 
   describe('by meaning language', () => {
@@ -166,22 +189,22 @@ describe('generateQuiz', () => {
       make('dog', 'inu', { meaningLanguage: 'ja' }),
     ];
 
-    test('asks only the chosen language and takes the wrong options from it', () => {
+    it('should take the wrong options from the chosen language when a meaning language is chosen', () => {
       const settings = { meaningLanguage: 'id', count: 'all', type: 'choice' };
 
       const quiz = generateQuiz(words, settings, createSeededRng(4));
+      const options = quiz.flatMap((q) => q.options.map((option) => option.text));
 
       expect(quiz).toHaveLength(4);
       expect(quiz.every((q) => q.meaningLanguage === 'id')).toBe(true);
-      const options = quiz.flatMap((q) => q.options.map((option) => option.text));
       expect(options).not.toContain('Neko');
       expect(options).not.toContain('Inu');
     });
 
-    test.each([
+    it.each([
       ['ja', 2],
       [undefined, 6],
-    ])('meaning language %p asks %p words', (meaningLanguage, expected) => {
+    ])('should ask, for meaning language %p, %p words when the quiz is built', (meaningLanguage, expected) => {
       const settings = { meaningLanguage, count: 'all' };
 
       const quiz = generateQuiz(words, settings);
@@ -192,7 +215,7 @@ describe('generateQuiz', () => {
 });
 
 describe('quiz session', () => {
-  test('cannot skip an unanswered question', () => {
+  it('should not move on when the question is unanswered', () => {
     const { session } = sessionAfter([]);
 
     const after = quizSessionReducer(session, next);
@@ -201,7 +224,7 @@ describe('quiz session', () => {
     expect(after.awaitingNext).toBe(false);
   });
 
-  test('ignores a second answer to the same question', () => {
+  it('should ignore the second answer when a question is answered twice', () => {
     const { session } = sessionAfter([answer('correct')]);
 
     const after = quizSessionReducer(session, answer('wrong', 'y'));
@@ -209,7 +232,7 @@ describe('quiz session', () => {
     expect(after.answers).toHaveLength(1);
   });
 
-  test('"next" moves on after an answer', () => {
+  it('should move on when "next" follows an answer', () => {
     const { session } = sessionAfter([answer('correct')], 2);
 
     const after = quizSessionReducer(session, next);
@@ -218,7 +241,7 @@ describe('quiz session', () => {
     expect(after.awaitingNext).toBe(false);
   });
 
-  test('is not finished while the last answer waits for "next"', () => {
+  it('should not be finished when the last answer waits for "next"', () => {
     const actions = THREE_ANSWERS;
 
     const { session } = sessionAfter(actions);
@@ -226,7 +249,7 @@ describe('quiz session', () => {
     expect(isQuizFinished(session)).toBe(false);
   });
 
-  test('is finished after "next" on the last question', () => {
+  it('should be finished when "next" follows the last answer', () => {
     const { session } = sessionAfter(THREE_ANSWERS);
 
     const after = quizSessionReducer(session, next);
@@ -234,7 +257,7 @@ describe('quiz session', () => {
     expect(isQuizFinished(after)).toBe(true);
   });
 
-  test('ignores unknown actions', () => {
+  it('should ignore the action when it is unknown', () => {
     const { session } = sessionAfter([answer('correct')]);
 
     const after = quizSessionReducer(session, { type: 'unknown' });
@@ -242,7 +265,7 @@ describe('quiz session', () => {
     expect(after).toBe(session);
   });
 
-  test.each([answer('wrong'), next])('a finished quiz ignores %j', (action) => {
+  it.each([answer('wrong'), next])('should ignore %j when the quiz is finished', (action) => {
     const finished = createQuizSession([]);
 
     const after = quizSessionReducer(finished, action);
@@ -252,7 +275,7 @@ describe('quiz session', () => {
 });
 
 describe('summarizeQuiz', () => {
-  test('counts the results; a close answer counts as correct', () => {
+  it('should count a close answer as correct when the results are counted', () => {
     const { session } = sessionAfter([...THREE_ANSWERS, next]);
 
     const summary = summarizeQuiz(session);
@@ -262,7 +285,7 @@ describe('summarizeQuiz', () => {
     ]);
   });
 
-  test('lists the missed words with the given answer', () => {
+  it('should list the missed words with the given answer when some answers are wrong', () => {
     const { questions, session } = sessionAfter([...THREE_ANSWERS, next]);
 
     const { missed } = summarizeQuiz(session);
@@ -272,7 +295,7 @@ describe('summarizeQuiz', () => {
     expect(missed[0].given).toBe('z');
   });
 
-  test('handles an empty quiz', () => {
+  it('should return zero counts when the quiz is empty', () => {
     const session = createQuizSession([]);
 
     const summary = summarizeQuiz(session);

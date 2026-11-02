@@ -1,7 +1,7 @@
 import { normalizeText } from '../../lib/text.js';
 
 /** Header names (Indonesian and English) recognised for each field. */
-export const COLUMN_ALIASES = {
+const COLUMN_ALIASES = {
   term: ['kata', 'word', 'term', 'vocabulary', 'vocab', 'kosakata', 'english', 'inggris', 'bahasa inggris', 'kata inggris'],
   meaning: [
     'arti',

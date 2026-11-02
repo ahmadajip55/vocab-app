@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { createWord, DEFAULT_TARGETS } from '../../../features/vocabulary/model.js';
 import { createSeededRng } from '../../../lib/random.js';
 import { buildDeck, meaningLanguagesOf, selectWords } from '../../../features/flashcards/deck.js';
@@ -16,7 +16,7 @@ function sessionAfter(ids, answers) {
 }
 
 describe('selectWords', () => {
-  test('keeps the list order (words are stored in Title Case)', () => {
+  it('should keep the list order when no setting filters the words', () => {
     const words = [word('a'), word('b', { mastery: DEFAULT_TARGETS.mastered }), word('c', { mastery: 1 })];
 
     const selected = selectWords(words, {});
@@ -24,7 +24,7 @@ describe('selectWords', () => {
     expect(selected.map((w) => w.term)).toEqual(['A', 'B', 'C']);
   });
 
-  test('can skip mastered words', () => {
+  it('should skip mastered words when only unmastered words are asked for', () => {
     const words = [word('a'), word('b', { mastery: DEFAULT_TARGETS.mastered }), word('c', { mastery: 1 })];
 
     const selected = selectWords(words, { onlyUnmastered: true });
@@ -32,7 +32,7 @@ describe('selectWords', () => {
     expect(selected.map((w) => w.term)).toEqual(['A', 'C']);
   });
 
-  test('a custom mastered target decides which words are mastered', () => {
+  it('should use the custom target when deciding which words are mastered', () => {
     const words = [word('a', { mastery: 5 }), word('b', { mastery: 4 })];
 
     const selected = selectWords(words, { onlyUnmastered: true, targets: { mastered: 5, passed: 100 } });
@@ -47,12 +47,12 @@ describe('selectWords', () => {
       word('B', { meaningLanguage: 'id', mastery: DEFAULT_TARGETS.mastered }),
     ];
 
-    test.each([
+    it.each([
       [{ meaningLanguage: 'id' }, ['A/id', 'B/id']],
       [{ meaningLanguage: 'en' }, ['A/en']],
       [{ meaningLanguage: 'id', onlyUnmastered: true }, ['A/id']],
       [{ meaningLanguage: 'ja' }, []],
-    ])('settings %j select %j', (settings, expected) => {
+    ])('should turn settings %j into the selection %j when words are selected', (settings, expected) => {
       const selected = selectWords(words, settings);
 
       expect(selected.map((w) => `${w.term}/${w.meaningLanguage}`)).toEqual(expected);
@@ -61,7 +61,7 @@ describe('selectWords', () => {
 });
 
 describe('meaningLanguagesOf', () => {
-  test('lists the meaning languages, most-used first', () => {
+  it('should list the most-used meaning language first when words have several', () => {
     const words = [
       word('A', { meaningLanguage: 'id' }),
       word('A', { meaningLanguage: 'en' }),
@@ -76,7 +76,7 @@ describe('meaningLanguagesOf', () => {
     ]);
   });
 
-  test('is empty for no words', () => {
+  it('should return an empty list when there are no words', () => {
     const words = [];
 
     const languages = meaningLanguagesOf(words);
@@ -88,7 +88,7 @@ describe('meaningLanguagesOf', () => {
 describe('buildDeck', () => {
   const terms = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-  test('keeps the order when shuffle is off', () => {
+  it('should keep the order when shuffle is off', () => {
     const words = terms.map((term) => word(term));
 
     const deck = buildDeck(words, { shuffle: false });
@@ -96,7 +96,7 @@ describe('buildDeck', () => {
     expect(deck.map((w) => w.term)).toEqual(terms);
   });
 
-  test('changes the order, but not the cards, when shuffle is on', () => {
+  it('should change the order but not the cards when shuffle is on', () => {
     const words = terms.map((term) => word(term));
 
     const deck = buildDeck(words, { shuffle: true }, createSeededRng(3));
@@ -107,7 +107,7 @@ describe('buildDeck', () => {
 });
 
 describe('flashcard session', () => {
-  test('a new session is not finished', () => {
+  it('should not be finished when the session is new', () => {
     const ids = ['1', '2', '3'];
 
     const session = createFlashcardSession(ids);
@@ -115,7 +115,7 @@ describe('flashcard session', () => {
     expect(isFlashcardSessionFinished(session)).toBe(false);
   });
 
-  test('an empty session is finished immediately', () => {
+  it('should be finished at once when there are no cards', () => {
     const ids = [];
 
     const session = createFlashcardSession(ids);
@@ -123,7 +123,7 @@ describe('flashcard session', () => {
     expect(isFlashcardSessionFinished(session)).toBe(true);
   });
 
-  test('flipping turns the card over', () => {
+  it('should turn the card over when it is flipped', () => {
     const session = createFlashcardSession(['1', '2', '3']);
 
     const next = flashcardSessionReducer(session, { type: 'flipped' });
@@ -131,7 +131,7 @@ describe('flashcard session', () => {
     expect(next.flipped).toBe(true);
   });
 
-  test('an answer moves to the next card face down and records it', () => {
+  it('should record the answer and show the next card face down when a card is answered', () => {
     const session = flashcardSessionReducer(createFlashcardSession(['1', '2', '3']), { type: 'flipped' });
 
     const next = flashcardSessionReducer(session, { type: 'answered', known: true });
@@ -139,7 +139,7 @@ describe('flashcard session', () => {
     expect([next.index, next.flipped, next.known]).toEqual([1, false, ['1']]);
   });
 
-  test('the last answer finishes the session and splits known from unknown', () => {
+  it('should finish and split known from unknown when the last card is answered', () => {
     const session = sessionAfter(['1', '2', '3'], [true, false]);
 
     const finished = flashcardSessionReducer(session, { type: 'answered', known: true });
@@ -148,7 +148,7 @@ describe('flashcard session', () => {
     expect([finished.known, finished.unknown]).toEqual([['1', '3'], ['2']]);
   });
 
-  test('a finished session ignores further answers', () => {
+  it('should ignore further answers when the session is finished', () => {
     const finished = sessionAfter(['1'], [true]);
 
     const after = flashcardSessionReducer(finished, { type: 'answered', known: true });
@@ -156,7 +156,7 @@ describe('flashcard session', () => {
     expect(after).toBe(finished);
   });
 
-  test('unknown actions are ignored', () => {
+  it('should ignore the action when it is unknown', () => {
     const session = createFlashcardSession(['1']);
 
     const after = flashcardSessionReducer(session, { type: 'unknown' });
@@ -192,7 +192,7 @@ describe('loadCardExamples', () => {
     clearCardExamples();
   });
 
-  test('keeps human translations and machine-translates the rest (sentences keep their case)', async () => {
+  it('should keep human translations and machine-translate the rest when examples are loaded', async () => {
     const { fetchImpl } = fakeServices();
 
     const examples = await loadCardExamples(cat, { fetchImpl });
@@ -203,7 +203,7 @@ describe('loadCardExamples', () => {
     ]);
   });
 
-  test('is cached for the session', async () => {
+  it('should use the cache when the same card is loaded again', async () => {
     const services = fakeServices();
     const first = await loadCardExamples(cat, { fetchImpl: services.fetchImpl });
     const requestsBefore = services.requests();

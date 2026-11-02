@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { beforeEach, describe, expect, jest, it } from '@jest/globals';
 import { createSeededRng } from '../../../lib/random.js';
 import {
   CEFR_RANKS,
@@ -33,7 +33,7 @@ beforeEach(() => {
 });
 
 describe('parseFrequencyList', () => {
-  test('keeps real words in frequency order and drops junk', () => {
+  it('should keep real words in frequency order when the list has junk', () => {
     const text = "you 100\ni 90\nthe 80\n123 70\nit's 60\nThe 50\ncafé 40\nwell-known 30\n- 20\n\nstraße 10";
 
     const words = parseFrequencyList(text);
@@ -41,7 +41,7 @@ describe('parseFrequencyList', () => {
     expect(words).toEqual(['you', 'the', "it's", 'café', 'well-known', 'straße']);
   });
 
-  test('is empty for no text', () => {
+  it('should return an empty list when there is no text', () => {
     const text = undefined;
 
     const words = parseFrequencyList(text);
@@ -53,7 +53,7 @@ describe('parseFrequencyList', () => {
 describe('CEFR levels', () => {
   const words = Array.from({ length: 20000 }, (_, i) => `w${i}`);
 
-  test('are A1 to C2', () => {
+  it('should be A1 to C2 when the levels are listed', () => {
     const ranks = CEFR_RANKS;
 
     const levels = Object.keys(ranks);
@@ -61,7 +61,7 @@ describe('CEFR levels', () => {
     expect(levels).toEqual(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
   });
 
-  test('A1 is the 500 most frequent words', () => {
+  it('should be the 500 most frequent words when the level is A1', () => {
     const levels = ['A1'];
 
     const slice = cefrSlice(words, levels);
@@ -69,7 +69,7 @@ describe('CEFR levels', () => {
     expect(slice).toEqual(words.slice(0, 500));
   });
 
-  test('several levels are combined', () => {
+  it('should combine the ranges when several levels are chosen', () => {
     const levels = ['A2', 'C2'];
 
     const slice = cefrSlice(words, levels);
@@ -77,7 +77,7 @@ describe('CEFR levels', () => {
     expect(slice).toHaveLength(500 + 8000);
   });
 
-  test('a JLPT level is not a CEFR band', () => {
+  it('should give no range when the level is a JLPT level', () => {
     const levels = ['N5'];
 
     const slice = cefrSlice(words, levels);
@@ -87,7 +87,7 @@ describe('CEFR levels', () => {
 });
 
 describe('parseJlptEntries', () => {
-  test('reads the written form and skips blank entries', () => {
+  it('should read the written form and skip blanks when entries are parsed', () => {
     const data = { words: [{ word: '毎朝' }, { word: ' ' }, {}, { word: 'お茶' }] };
 
     const entries = parseJlptEntries(data);
@@ -95,7 +95,7 @@ describe('parseJlptEntries', () => {
     expect(entries.map((entry) => entry.term)).toEqual(['毎朝', 'お茶']);
   });
 
-  test('is empty for no data', () => {
+  it('should return an empty list when there is no data', () => {
     const data = null;
 
     const entries = parseJlptEntries(data);
@@ -112,7 +112,7 @@ describe('fetchSampleTerms', () => {
         'level=4': ok({ words: [{ word: '会議' }, { word: '問題' }] }),
       });
 
-    test('picks from every chosen JLPT level and skips words already in the program', async () => {
+    it('should pick from every chosen JLPT level and skip existing words when the program is Japanese', async () => {
       const fetchImpl = jlpt();
 
       const result = await fetchSampleTerms({ wordLanguage: 'ja', levels: ['N5', 'N4'], count: 10, existingTerms: ['毎朝'], fetchImpl });
@@ -122,19 +122,19 @@ describe('fetchSampleTerms', () => {
       expect(result.levels).toEqual(['N5', 'N4']);
     });
 
-    test('downloads a large pool from the JLPT list, whatever the count', async () => {
+    it('should download a large pool from the JLPT list when any count is asked for', async () => {
       const fetchImpl = jlpt();
 
       await fetchSampleTerms({ wordLanguage: 'ja', levels: ['N5', 'N4'], count: 10, fetchImpl });
-
       const urls = fetchImpl.mock.calls.map(([url]) => url);
+
       expect(urls.every((url) => url.startsWith('https://jlpt-vocab-api.vercel.app/api/words?level='))).toBe(true);
       expect(urls.every((url) => url.includes('limit=1000'))).toBe(true);
     });
   });
 
   describe('for other languages', () => {
-    test('uses the frequency list of the program language and the chosen CEFR band', async () => {
+    it('should use the frequency list and CEFR band of the program when it is not Japanese', async () => {
       const fetchImpl = fakeFetch({ '/de/de_50k.txt': ok(frequencyFile(3000)) });
       const band = new Set(parseFrequencyList(frequencyFile(3000)).slice(500, 1000));
 
@@ -146,7 +146,7 @@ describe('fetchSampleTerms', () => {
       expect(fetchImpl.mock.calls[0][0]).toMatch(/FrequencyWords\/master\/content\/2018\/de\/de_50k\.txt$/);
     });
 
-    test('downloads the list once per session', async () => {
+    it('should download the list once when samples are asked for again', async () => {
       const fetchImpl = fakeFetch({ '/de/de_50k.txt': ok(frequencyFile(3000)) });
       await fetchSampleTerms({ wordLanguage: 'de', levels: ['A2'], count: 25, fetchImpl });
 
@@ -155,7 +155,7 @@ describe('fetchSampleTerms', () => {
       expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
 
-    test('caps the count at 100', async () => {
+    it('should cap the count at 100 when more are asked for', async () => {
       const fetchImpl = fakeFetch({ '/en/en_50k.txt': ok(frequencyFile(20000)) });
 
       const result = await fetchSampleTerms({ wordLanguage: 'en', levels: ['C2'], count: 5000, fetchImpl });
@@ -164,7 +164,7 @@ describe('fetchSampleTerms', () => {
       expect(result.terms).toHaveLength(100);
     });
 
-    test('a program without levels starts at the beginner level', async () => {
+    it('should start at the beginner level when the program has no levels', async () => {
       const fetchImpl = fakeFetch({ '/en/en_50k.txt': ok(frequencyFile(20000)) });
 
       const result = await fetchSampleTerms({ wordLanguage: 'en', levels: [], count: 3, fetchImpl });
@@ -186,7 +186,7 @@ describe('fetchSampleTerms', () => {
     }
     const request = { wordLanguage: 'fr', levels: ['A1'], count: 2 };
 
-    test('reports the failure', async () => {
+    it('should report the failure when the download fails', async () => {
       const fetchImpl = failingOnce();
 
       const attempt = fetchSampleTerms({ ...request, fetchImpl });
@@ -194,7 +194,7 @@ describe('fetchSampleTerms', () => {
       await expect(attempt).rejects.toThrow(/Could not download sample words.*HTTP 503/);
     });
 
-    test('tries again on the next attempt', async () => {
+    it('should try again when the next attempt follows a failure', async () => {
       const fetchImpl = failingOnce();
       await fetchSampleTerms({ ...request, fetchImpl }).catch(() => {});
 

@@ -9,8 +9,8 @@ import { getLanguage, normalizeLanguageCode } from '../../languages/index.js';
  * Source 2: dictionaryapi.dev (free, no key) - English only.
  */
 
-export const TATOEBA_URL = 'https://tatoeba.org/en/api_v0/search';
-export const DICTIONARY_API_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+const TATOEBA_URL = 'https://tatoeba.org/en/api_v0/search';
+const DICTIONARY_API_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 
 const MIN_LENGTH = 8;
 const MAX_LENGTH = 90;

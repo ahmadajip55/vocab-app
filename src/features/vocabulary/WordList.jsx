@@ -7,7 +7,7 @@ import { getLanguage } from '../../languages/index.js';
 import { fetchRomaji, needsRomajiLookup, romajiForWord } from '../../languages/japanese/romaji.js';
 import { clampPage, pageCount, pageItems } from '../../lib/pagination.js';
 
-export const PAGE_SIZE = 10;
+const PAGE_SIZE = 10;
 
 /** Romaji for a row: any entry's saved reading, or one worked out from kana. */
 function groupRomaji(group) {

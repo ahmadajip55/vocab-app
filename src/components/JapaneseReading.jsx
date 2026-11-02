@@ -5,9 +5,10 @@ import { fetchRomaji, japaneseReading, needsRomajiLookup } from '../languages/ja
  * The kana reading and romaji under a Japanese word: 右 -> "みぎ · migi",
  * コーヒー -> "koohii". Renders nothing for other languages.
  * A word with kanji and no saved reading is looked up once, and onRomaji(id, romaji)
- * saves the result. Spans only, so it can sit inside a button (the flashcard).
+ * saves the result. Spans only, so it can sit inside a button (the flashcard, a quiz option).
+ * size="small" is for a reading inside a button or list.
  */
-export function JapaneseReading({ word, onRomaji }) {
+export function JapaneseReading({ word, onRomaji, size }) {
   const [found, setFound] = useState({ id: null, romaji: '' });
   const romaji = word.romaji || (found.id === word.id ? found.romaji : '');
 
@@ -31,7 +32,7 @@ export function JapaneseReading({ word, onRomaji }) {
   const reading = japaneseReading({ ...word, romaji });
   if (!reading || (!reading.kana && !reading.romaji)) return null;
   return (
-    <span className="jp-reading">
+    <span className={size === 'small' ? 'jp-reading jp-reading--small' : 'jp-reading'}>
       {reading.kana ? <span lang="ja">{reading.kana}</span> : null}
       {reading.kana && reading.romaji ? <span aria-hidden="true"> · </span> : null}
       {reading.romaji ? <span lang="ja-Latn">{reading.romaji}</span> : null}

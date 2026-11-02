@@ -4,7 +4,7 @@ import { cleanText, titleText } from '../../lib/text.js';
 import { getLanguage } from '../../languages/index.js';
 import { normalizeRomaji } from '../../languages/japanese/romaji.js';
 import { DEFAULT_LANGUAGES, DEFAULT_TARGETS, LIMITS, TARGET_LIMITS, normalizeLanguageCode, sanitizeTarget } from './model.js';
-import { sanitizeLevels } from './programs.js';
+import { PROGRAM_NAME_LIMIT, sanitizeLevels } from './programs.js';
 
 /** Legacy key from before programs existed; still the default for loadWords/saveWords. */
 export const STORAGE_KEY = 'vocab-app:v1';
@@ -13,7 +13,7 @@ export const SETTINGS_KEY = 'vocab-app:settings';
 const SCHEMA_VERSION = 1;
 // Word lists are saved compressed (lz-string, safe for UTF-16 storage), several times smaller than JSON.
 const COMPRESSED_PREFIX = 'lz:';
-const PROGRAM_NAME_LIMIT = 60;
+const PROGRAM_FIELDS = ['id', 'name', 'wordLanguage', 'levels', 'masteredLevel', 'passedLevel', 'createdAt'];
 
 /** Each program keeps its words under its own key. */
 export function programWordsKey(programId) {
@@ -33,46 +33,61 @@ function toCount(value) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
 
+const languageOr = (value, fallback) => cleanText(value).slice(0, 20) || fallback;
+const timestamp = (value) => (Number.isFinite(value) ? value : Date.now());
+
+/** Writes `value` under `key`; returns false when there is no storage or it is full or blocked. */
+function writeItem(storage, key, value) {
+  try {
+    if (!storage) return false;
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Clean items from an untrusted list, each with an id no other item has. Items `clean` returns null for are dropped. */
+function withUniqueIds(raw, clean) {
+  if (!Array.isArray(raw)) return [];
+  const usedIds = new Set();
+  const items = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const cleaned = clean(item);
+    if (!cleaned) continue;
+    if (typeof cleaned.id !== 'string' || !cleaned.id || usedIds.has(cleaned.id)) cleaned.id = createId();
+    usedIds.add(cleaned.id);
+    items.push(cleaned);
+  }
+  return items;
+}
+
 function normalizePersistedWord(item) {
   // Saved lists from before Title Case was the rule are converted as they load.
   const term = titleText(item.term).slice(0, LIMITS.term);
   if (!term) return null;
 
-  const wordLanguage = cleanText(item.wordLanguage).slice(0, 20) || DEFAULT_LANGUAGES.wordLanguage;
-  const meaningLanguage = cleanText(item.meaningLanguage).slice(0, 20) || DEFAULT_LANGUAGES.meaningLanguage;
+  const wordLanguage = languageOr(item.wordLanguage, DEFAULT_LANGUAGES.wordLanguage);
 
   return {
-    id: typeof item.id === 'string' && item.id ? item.id : createId(),
+    id: item.id,
     term,
     meaning: titleText(item.meaning).slice(0, LIMITS.meaning),
     wordLanguage,
-    meaningLanguage,
+    meaningLanguage: languageOr(item.meaningLanguage, DEFAULT_LANGUAGES.meaningLanguage),
     romaji: wordLanguage === 'ja' ? normalizeRomaji(item.romaji).slice(0, LIMITS.term * 4) : '',
     mastery: Math.min(TARGET_LIMITS.max, toCount(item.mastery)),
     quizPassed: toCount(item.quizPassed),
     attempts: toCount(item.attempts),
     correctCount: toCount(item.correctCount),
-    createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+    createdAt: timestamp(item.createdAt),
   };
 }
 
-/** Validate untrusted data (from localStorage) into a clean word list. */
+/** Validate untrusted data (from localStorage or a backup) into a clean word list. */
 export function sanitizeWords(raw) {
-  if (!Array.isArray(raw)) return [];
-  const usedIds = new Set();
-  const words = [];
-
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue;
-    const prepared = normalizePersistedWord(item);
-    if (!prepared) continue;
-
-    if (usedIds.has(prepared.id)) prepared.id = createId();
-    usedIds.add(prepared.id);
-
-    words.push(prepared);
-  }
-  return words;
+  return withUniqueIds(raw, normalizePersistedWord);
 }
 
 /** The JSON text of a saved word list; lists saved before compression are plain JSON already. */
@@ -103,24 +118,23 @@ function serializeForStorage(word) {
   const term = cleanText(word.term).slice(0, LIMITS.term);
   if (!term) return null;
 
-  const normalizedWordLanguage = cleanText(word.wordLanguage).slice(0, 20) || DEFAULT_LANGUAGES.wordLanguage;
-  const normalizedMeaningLanguage = cleanText(word.meaningLanguage).slice(0, 20) || DEFAULT_LANGUAGES.meaningLanguage;
+  const wordLanguage = languageOr(word.wordLanguage, DEFAULT_LANGUAGES.wordLanguage);
 
   const persisted = {
     id: word.id,
     term,
-    wordLanguage: normalizedWordLanguage,
-    meaningLanguage: normalizedMeaningLanguage,
+    wordLanguage,
+    meaningLanguage: languageOr(word.meaningLanguage, DEFAULT_LANGUAGES.meaningLanguage),
     mastery: Math.min(TARGET_LIMITS.max, toCount(word.mastery)),
     quizPassed: toCount(word.quizPassed),
     attempts: toCount(word.attempts),
     correctCount: toCount(word.correctCount),
-    createdAt: Number.isFinite(word.createdAt) ? word.createdAt : Date.now(),
+    createdAt: timestamp(word.createdAt),
   };
   // Saved meanings (typed or translated) survive a reload instead of being looked up again.
   const meaning = cleanText(word.meaning).slice(0, LIMITS.meaning);
   if (meaning) persisted.meaning = meaning;
-  const romaji = normalizedWordLanguage === 'ja' ? normalizeRomaji(word.romaji) : '';
+  const romaji = wordLanguage === 'ja' ? normalizeRomaji(word.romaji) : '';
   if (romaji) persisted.romaji = romaji;
 
   return persisted;
@@ -131,44 +145,32 @@ export function toStoredWords(words) {
   return words.map((word) => serializeForStorage(word)).filter(Boolean);
 }
 
+/** A word list as the compressed text that is saved. */
+function encodeWords(words) {
+  const json = JSON.stringify({ version: SCHEMA_VERSION, words: toStoredWords(words) });
+  return COMPRESSED_PREFIX + LZString.compressToUTF16(json);
+}
+
 /** Returns true when the data was written. */
 export function saveWords(words, storage = getDefaultStorage(), key = STORAGE_KEY) {
-  try {
-    if (!storage) return false;
-    const json = JSON.stringify({ version: SCHEMA_VERSION, words: toStoredWords(words) });
-    storage.setItem(key, COMPRESSED_PREFIX + LZString.compressToUTF16(json));
-    return true;
-  } catch {
-    return false;
-  }
+  return writeItem(storage, key, encodeWords(words));
 }
 
 /** Validate untrusted data into a clean program list with unique ids. */
 export function sanitizePrograms(raw) {
-  if (!Array.isArray(raw)) return [];
-  const usedIds = new Set();
-  const programs = [];
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue;
+  return withUniqueIds(raw, (item) => {
     const name = cleanText(item.name).slice(0, PROGRAM_NAME_LIMIT);
-    if (!name) continue;
-    let id = typeof item.id === 'string' && item.id ? item.id : createId();
-    if (usedIds.has(id)) id = createId();
-    usedIds.add(id);
-    const wordLanguage = item.wordLanguage ? normalizeLanguageCode(item.wordLanguage, DEFAULT_LANGUAGES.wordLanguage) : null;
-    const levels = Array.isArray(item.levels) ? item.levels : [];
-    programs.push({
-      id,
+    if (!name) return null;
+    return {
+      id: item.id,
       name,
-      wordLanguage,
-      levels,
+      wordLanguage: item.wordLanguage ? normalizeLanguageCode(item.wordLanguage, DEFAULT_LANGUAGES.wordLanguage) : null,
+      levels: Array.isArray(item.levels) ? item.levels : [],
       // Programs saved before targets existed keep the defaults.
-      masteredLevel: sanitizeTarget(item.masteredLevel, DEFAULT_TARGETS.mastered),
-      passedLevel: sanitizeTarget(item.passedLevel, DEFAULT_TARGETS.passed),
-      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
-    });
-  }
-  return programs;
+      ...cleanSettings(item),
+      createdAt: timestamp(item.createdAt),
+    };
+  });
 }
 
 /** The word language most of these words use. */
@@ -197,15 +199,7 @@ function migrateLegacyWords(words) {
   const wordsByProgram = {};
   for (const [wordLanguage, list] of byLanguage) {
     const name = byLanguage.size > 1 ? `My words (${getLanguage(wordLanguage).label})` : 'My words';
-    const program = {
-      id: createId(),
-      name,
-      wordLanguage,
-      levels: [],
-      masteredLevel: DEFAULT_TARGETS.mastered,
-      passedLevel: DEFAULT_TARGETS.passed,
-      createdAt: Date.now(),
-    };
+    const program = { id: createId(), name, wordLanguage, levels: [], ...cleanSettings(null), createdAt: Date.now() };
     programs.push(program);
     wordsByProgram[program.id] = list;
   }
@@ -250,24 +244,18 @@ export function settlePrograms(programs, wordsOf) {
   return { programs: settled, wordsByProgram };
 }
 
+/** A program as it is saved (and exported in a backup), without anything added while the app runs. */
+export function toStoredProgram(program) {
+  return Object.fromEntries(PROGRAM_FIELDS.map((field) => [field, program[field]]));
+}
+
+function encodePrograms(programs) {
+  return JSON.stringify({ version: SCHEMA_VERSION, programs: programs.map(toStoredProgram) });
+}
+
 /** Returns true when the program list was written. */
 export function savePrograms(programs, storage = getDefaultStorage()) {
-  try {
-    if (!storage) return false;
-    const persisted = programs.map(({ id, name, wordLanguage, levels, masteredLevel, passedLevel, createdAt }) => ({
-      id,
-      name,
-      wordLanguage,
-      levels,
-      masteredLevel,
-      passedLevel,
-      createdAt,
-    }));
-    storage.setItem(PROGRAMS_KEY, JSON.stringify({ version: SCHEMA_VERSION, programs: persisted }));
-    return true;
-  } catch {
-    return false;
-  }
+  return writeItem(storage, PROGRAMS_KEY, encodePrograms(programs));
 }
 
 /** Remove a deleted program's words, or the legacy list once it has been migrated. */
@@ -280,8 +268,8 @@ export function removeStoredWords(key, storage = getDefaultStorage()) {
 }
 
 /**
- * App settings: the learning targets new programs start with,
- * { masteredLevel, passedLevel }, each 1-100 (default 100).
+ * Learning targets, { masteredLevel, passedLevel }, each 1-100 (default 100):
+ * the app settings (what the next new program starts with) and each program's own.
  */
 export function cleanSettings(raw) {
   return {
@@ -300,11 +288,58 @@ export function loadSettings(storage = getDefaultStorage()) {
 
 /** Returns true when the settings were written. */
 export function saveSettings(settings, storage = getDefaultStorage()) {
+  return writeItem(storage, SETTINGS_KEY, JSON.stringify({ version: SCHEMA_VERSION, ...cleanSettings(settings) }));
+}
+
+/** Every key this app keeps its programs and words under. */
+function appKeys(storage) {
+  const keys = [];
+  for (let i = 0; i < storage.length; i++) {
+    const key = storage.key(i);
+    if (key === PROGRAMS_KEY || key === STORAGE_KEY || key.startsWith(`${STORAGE_KEY}:program:`)) keys.push(key);
+  }
+  return keys;
+}
+
+/**
+ * Replaces every stored program and word list (a restored backup) all at once, or not at all:
+ * when the new data does not fit, the old data is put back.
+ * Returns 'saved', 'too-large' (nothing changed) or 'unavailable' (no storage to write to).
+ */
+export function replaceStoredPrograms({ programs, wordsByProgram }, storage = getDefaultStorage()) {
+  let previous;
   try {
-    if (!storage) return false;
-    storage.setItem(SETTINGS_KEY, JSON.stringify({ version: SCHEMA_VERSION, ...cleanSettings(settings) }));
-    return true;
+    if (!storage) return 'unavailable';
+    previous = new Map(appKeys(storage).map((key) => [key, storage.getItem(key)]));
   } catch {
-    return false;
+    return 'unavailable';
+  }
+  try {
+    // The old data is removed first, so its space can be used by the new data.
+    for (const key of previous.keys()) storage.removeItem(key);
+    for (const program of programs) storage.setItem(programWordsKey(program.id), encodeWords(wordsByProgram[program.id] ?? []));
+    storage.setItem(PROGRAMS_KEY, encodePrograms(programs));
+    return 'saved';
+  } catch {
+    try {
+      for (const key of appKeys(storage)) storage.removeItem(key);
+      for (const [key, value] of previous) storage.setItem(key, value);
+    } catch {
+      // the old data still fits, as it did before
+    }
+    return 'too-large';
+  }
+}
+
+/** Characters this app keeps in storage; browsers count about 2 bytes for each. */
+export function storageUsage(storage = getDefaultStorage()) {
+  try {
+    if (!storage) return 0;
+    return [...appKeys(storage), SETTINGS_KEY].reduce((sum, key) => {
+      const value = storage.getItem(key);
+      return value === null ? sum : sum + key.length + value.length;
+    }, 0);
+  } catch {
+    return 0;
   }
 }

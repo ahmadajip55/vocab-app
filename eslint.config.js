@@ -19,6 +19,7 @@ export default [
     rules: {
       'react/jsx-uses-vars': 'error',
       'react/jsx-key': 'error',
+      'react/jsx-no-undef': 'error',
       'react/no-unknown-property': 'error',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',

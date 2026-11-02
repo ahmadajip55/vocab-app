@@ -1,8 +1,8 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { LANGUAGES, LANGUAGE_OPTIONS, getLanguage, normalizeLanguageCode } from '../../languages/index.js';
 
 describe('language profiles', () => {
-  test('every word language is listed once, in the approved order', () => {
+  it('should list every word language once, in the approved order, when languages are listed', () => {
     const expected = ['en', 'id', 'ja', 'es', 'de', 'fr', 'it', 'nl', 'pt', 'pl'];
 
     const codes = LANGUAGES.map((language) => language.code);
@@ -11,7 +11,7 @@ describe('language profiles', () => {
     expect(LANGUAGE_OPTIONS).toHaveLength(LANGUAGES.length);
   });
 
-  test.each(LANGUAGES.map((language) => [language.code, language]))('%s has a complete profile', (code, language) => {
+  it.each(LANGUAGES.map((language) => [language.code, language]))('should describe %s fully when its profile is read', (code, language) => {
     const { label, tatoeba, speech, inputProps } = language;
 
     expect(label).toBeTruthy();
@@ -20,7 +20,7 @@ describe('language profiles', () => {
     expect(inputProps.lang).toBe(code);
   });
 
-  test('every language has its own Tatoeba code', () => {
+  it('should give every language its own Tatoeba code when profiles are read', () => {
     const codes = LANGUAGES.map((language) => language.tatoeba);
 
     const unique = new Set(codes);
@@ -30,7 +30,7 @@ describe('language profiles', () => {
 });
 
 describe('input helpers', () => {
-  test('only Japanese uses the romaji input method', () => {
+  it('should use the romaji input method only when the language is Japanese', () => {
     const languages = LANGUAGES;
 
     const withIme = languages.filter((language) => language.ime).map((language) => language.code);
@@ -38,26 +38,26 @@ describe('input helpers', () => {
     expect(withIme).toEqual(['ja']);
   });
 
-  test.each([
+  it.each([
     ['es', 'ñ'],
     ['de', 'ß'],
     ['pl', 'ł'],
-  ])('%s offers the special character %s', (code, char) => {
+  ])('should give %s the special character %s when characters are offered', (code, char) => {
     const { chars } = getLanguage(code);
 
     expect(chars).toContain(char);
   });
 
-  test.each([
+  it.each([
     ['ja', { lang: 'ja', inputMode: 'text', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false }],
     ['en', { lang: 'en', inputMode: 'text', autoCapitalize: 'sentences', autoCorrect: 'on', spellCheck: true }],
-  ])('mobile keyboard hints follow the word language: %s', (code, expected) => {
+  ])('should give mobile keyboard hints when the word language is %s', (code, expected) => {
     const { inputProps } = getLanguage(code);
 
     expect(inputProps).toEqual(expected);
   });
 
-  test('English needs no special characters', () => {
+  it('should offer no special characters when the language is English', () => {
     const code = 'en';
 
     const { chars } = getLanguage(code);
@@ -67,13 +67,13 @@ describe('input helpers', () => {
 });
 
 describe('normalizeTerm', () => {
-  test.each([
+  it.each([
     ['日本', '日本'],
     ['コーヒー', 'コーヒー'],
     ['nihongo', 'にほんご'],
     ['日本go', '日本ご'],
     ['CD', 'CD'],
-  ])('Japanese keeps kanji and katakana and turns leftover romaji into hiragana: %p -> %p', (input, expected) => {
+  ])('should turn %p into %p when a Japanese term is normalized', (input, expected) => {
     const { normalizeTerm } = getLanguage('ja');
 
     const result = normalizeTerm(input);
@@ -81,7 +81,7 @@ describe('normalizeTerm', () => {
     expect(result).toBe(expected);
   });
 
-  test('Latin languages compose accents so "café" is one spelling', () => {
+  it('should compose accents into one spelling when the language is Latin-based', () => {
     const decomposed = 'café';
 
     const result = getLanguage('fr').normalizeTerm(decomposed);
@@ -91,16 +91,16 @@ describe('normalizeTerm', () => {
 });
 
 describe('language codes', () => {
-  test.each([
+  it.each([
     ['Japanese', 'ja'],
     ['', 'en'],
-  ])('normalizeLanguageCode(%p) is %p', (input, expected) => {
+  ])('should turn %p into %p when the language code is normalized', (input, expected) => {
     const code = normalizeLanguageCode(input);
 
     expect(code).toBe(expected);
   });
 
-  test('an unknown code behaves like English but keeps its own code', () => {
+  it('should behave like English but keep its own code when the code is unknown', () => {
     const code = 'sv';
 
     const language = getLanguage(code);

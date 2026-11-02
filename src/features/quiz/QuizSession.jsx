@@ -132,7 +132,11 @@ export function QuizSession({ questions, onResult, onRetryMissed, onNewQuiz, onR
                     disabled={session.awaitingNext}
                   >
                     <kbd aria-hidden="true">{index + 1}</kbd>
-                    <span>{option.text}</span>
+                    <span>
+                      <span lang={answersTerm ? answerLanguage.code : undefined}>{option.text}</span>
+                      {/* Japanese words as options: their kana reading and romaji. */}
+                      {option.word ? <JapaneseReading word={option.word} onRomaji={onRomaji} size="small" /> : null}
+                    </span>
                   </button>
                 </li>
               );

@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import {
   applyCandidate,
   buildCandidates,
@@ -15,13 +15,13 @@ import { lookupKanjiFallback } from '../../../languages/japanese/fallbackDiction
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
 describe('getComposition', () => {
-  test.each([
+  it.each([
     ['nihon', { start: 0, romaji: 'nihon' }],
     ['日本go', { start: 2, romaji: 'go' }],
     ['ko-hi-', { start: 0, romaji: 'ko-hi-' }],
     ['日本', null],
     ['', null],
-  ])('the composition of %p is the trailing romaji run', (text, expected) => {
+  ])('should be the trailing romaji run when the text is %p', (text, expected) => {
     const composition = getComposition(text);
 
     expect(composition).toEqual(expected);
@@ -29,27 +29,27 @@ describe('getComposition', () => {
 });
 
 describe('romaji to kana', () => {
-  test.each([
+  it.each([
     ['nihon', 'にほn'],
     ['nihonn', 'にほん'],
-  ])('previewKana(%p) is %p while typing', (romaji, expected) => {
+  ])('should show %p as %p when romaji is being typed', (romaji, expected) => {
     const kana = previewKana(romaji);
 
     expect(kana).toBe(expected);
   });
 
-  test.each([
+  it.each([
     ['nihon', 'にほん'],
     ['kyou', 'きょう'],
     ['ko-hi-', 'こーひー'],
     ['xyz', ''],
-  ])('toKanaIfComplete(%p) is %p', (romaji, expected) => {
+  ])('should turn %p into %p when the romaji is complete', (romaji, expected) => {
     const kana = toKanaIfComplete(romaji);
 
     expect(kana).toBe(expected);
   });
 
-  test('commitRomaji converts only the romaji', () => {
+  it('should convert only the romaji when it is committed', () => {
     const text = '日本go';
 
     const committed = commitRomaji(text);
@@ -57,7 +57,7 @@ describe('romaji to kana', () => {
     expect(committed).toBe('日本ご');
   });
 
-  test('choosing a candidate replaces only the romaji run', () => {
+  it('should replace only the romaji run when a candidate is chosen', () => {
     const text = '日本go';
     const composition = getComposition(text);
 
@@ -68,7 +68,7 @@ describe('romaji to kana', () => {
 });
 
 describe('offline candidates', () => {
-  test('give kanji first, then hiragana and katakana, and predict longer words', () => {
+  it('should give kanji first, then kana, and predict longer words when offline', () => {
     const romaji = 'nihon';
 
     const list = buildCandidates(romaji);
@@ -78,7 +78,7 @@ describe('offline candidates', () => {
     expect(list.length).toBeLessThanOrEqual(9);
   });
 
-  test('offer nothing for an unfinished syllable', () => {
+  it('should offer nothing when the syllable is unfinished', () => {
     const romaji = 'nih';
 
     const list = buildCandidates(romaji);
@@ -86,7 +86,7 @@ describe('offline candidates', () => {
     expect(list).toEqual([]);
   });
 
-  test('the built-in dictionary knows common words', () => {
+  it('should know common words when the built-in dictionary is used', () => {
     const reading = 'たべる';
 
     const kanji = lookupKanjiFallback(reading);
@@ -96,17 +96,17 @@ describe('offline candidates', () => {
 });
 
 describe('Google Input Tools', () => {
-  test.each([
+  it.each([
     [['SUCCESS', [['nihon', ['日本', 'ニホン', '二本'], [], { candidate_type: [0, 0, 0] }]]], ['日本', 'ニホン', '二本']],
     [['FAILED_TO_PARSE_REQUEST_BODY'], []],
     [null, []],
-  ])('parseGoogleCandidates reads %j', (payload, expected) => {
+  ])('should read the candidates when Google returns %j', (payload, expected) => {
     const candidates = parseGoogleCandidates(payload);
 
     expect(candidates).toEqual(expected);
   });
 
-  test('online candidates come first and are merged with kana without repeats', () => {
+  it('should put online candidates first, without repeats, when they are merged with kana', () => {
     const remote = ['日本', 'ニホン', '二本'];
 
     const merged = buildCandidates('nihon', remote);
@@ -116,7 +116,7 @@ describe('Google Input Tools', () => {
     expect(new Set(merged).size).toBe(merged.length);
   });
 
-  test('the request uses the keyless endpoint with the typed text', async () => {
+  it('should use the keyless endpoint with the typed text when candidates are requested', async () => {
     let url;
     const fetchImpl = async (requested) => {
       url = new URL(requested);
@@ -134,7 +134,7 @@ describe('Google Input Tools', () => {
 });
 
 describe('createCandidateService', () => {
-  test('caches online results', async () => {
+  it('should cache the results when the same text is asked again', async () => {
     let calls = 0;
     const service = createCandidateService({
       fetchImpl: async () => {
@@ -151,7 +151,7 @@ describe('createCandidateService', () => {
     expect(calls).toBe(1);
   });
 
-  test('falls back to offline candidates when the network fails', async () => {
+  it('should use offline candidates when the network fails', async () => {
     const service = createCandidateService({
       fetchImpl: async () => {
         throw new TypeError('Failed to fetch');
@@ -164,7 +164,7 @@ describe('createCandidateService', () => {
     expect(result.candidates[0]).toBe('日本');
   });
 
-  test('falls back to offline candidates when the request is refused', async () => {
+  it('should use offline candidates when the request is refused', async () => {
     const service = createCandidateService({ fetchImpl: async () => json({}, 403) });
 
     const result = await service.get('kyou');

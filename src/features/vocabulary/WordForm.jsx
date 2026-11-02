@@ -26,6 +26,7 @@ const TERM_PLACEHOLDERS = {
  * - Pass onCancel when editing; the form then keeps its values after saving.
  *
  * - wordLanguage is the program's word language; every word in it uses that language.
+ * - className replaces the form's own card styling, e.g. when it sits inside another card.
  *
  * Everything that depends on the word language (input method, keyboard hints,
  * special characters) comes from src/languages/<code>.js.
@@ -38,6 +39,7 @@ export function WordForm({
   findDuplicate,
   wordSuggestions = [],
   wordLanguage,
+  className = 'card card-body vstack gap-3',
 }) {
   // A new word starts with the meaning language most of the program's words use.
   const [values, setValues] = useState(() => ({
@@ -230,7 +232,7 @@ export function WordForm({
   };
 
   return (
-    <form className="card card-body vstack gap-3" onSubmit={handleSubmit} noValidate>
+    <form className={className} onSubmit={handleSubmit} noValidate>
       <div className="row g-3">
         <TextField className="col-md-6" label="Word language" value={language.label} readOnly hint="Set by the program." />
         <SelectField className="col-md-6" label="Meaning language" value={values.meaningLanguage} onChange={change('meaningLanguage')}>

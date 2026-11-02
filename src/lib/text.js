@@ -37,7 +37,8 @@ export function titleText(value) {
 export function normalizeText(value) {
   return String(value ?? '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[̀-ͯ]/g, '') // Latin accents: café = cafe
+    .normalize('NFC') // puts back the marks that make other letters, e.g. Japanese dakuten: まだ (mada) is not また (mata)
     .toLowerCase()
     .replace(/['’`]/g, '')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')

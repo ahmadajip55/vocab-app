@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button, ButtonLink } from '../components/Button.jsx';
+import { CollapsibleCard } from '../components/CollapsibleCard.jsx';
 import { ConfirmButton } from '../components/ConfirmButton.jsx';
 import { EmptyState } from '../components/EmptyState.jsx';
 import { TextField } from '../components/Fields.jsx';
@@ -84,16 +85,17 @@ export default function WordsPage() {
           />
         </section>
       ) : (
-        <section aria-label="Add word">
+        <CollapsibleCard title="Add word" storageKey="vocab-app:add-word-open">
           <WordForm
             key="new"
+            className="vstack gap-3"
             submitLabel="Add word"
             onSubmit={handleAdd}
             wordSuggestions={words}
             wordLanguage={program.wordLanguage}
             findDuplicate={(term, meaningLanguage) => findByTerm(words, term, undefined, meaningLanguage)}
           />
-        </section>
+        </CollapsibleCard>
       )}
 
       <p className="small fw-semibold text-success mb-0" role="status" style={{ minHeight: '1.5em' }}>

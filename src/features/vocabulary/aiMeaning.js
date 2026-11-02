@@ -13,9 +13,9 @@ import { normalizeLanguageCode } from '../../languages/index.js';
  * "Hidari"), so they are also tried in their most common kanji spelling (左).
  */
 
-export const DEFAULT_TRANSLATE_URL = 'https://translate.googleapis.com';
-export const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
-export const DICT_TRANSLATE_URL = 'https://clients5.google.com/translate_a/t';
+const DEFAULT_TRANSLATE_URL = 'https://translate.googleapis.com';
+const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
+const DICT_TRANSLATE_URL = 'https://clients5.google.com/translate_a/t';
 
 export function getLookupLanguages(overrides = {}) {
   return {

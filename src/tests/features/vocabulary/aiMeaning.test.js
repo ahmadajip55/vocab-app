@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from '@jest/globals';
+import { describe, expect, jest, it } from '@jest/globals';
 import {
   extractMeaningFromResponse,
   getAiMeaningConfig,
@@ -42,7 +42,7 @@ function fakeServices({ dictionary = {}, dictDown = false, failAfter = Infinity,
 }
 
 describe('configuration', () => {
-  test('needs no API key and defaults to the public Google endpoint', () => {
+  it('should use the public Google endpoint without an API key when nothing is configured', () => {
     const overrides = {};
 
     const { baseUrl } = getAiMeaningConfig(overrides);
@@ -50,7 +50,7 @@ describe('configuration', () => {
     expect(baseUrl).toBe('https://translate.googleapis.com');
   });
 
-  test('the endpoint can be overridden', () => {
+  it('should use the given endpoint when it is overridden', () => {
     const overrides = { baseUrl: 'https://example.test' };
 
     const { baseUrl } = getAiMeaningConfig(overrides);
@@ -58,7 +58,7 @@ describe('configuration', () => {
     expect(baseUrl).toBe('https://example.test');
   });
 
-  test('language names become codes', () => {
+  it('should turn language names into codes when languages are looked up', () => {
     const overrides = { wordLanguage: 'Japanese', meaningLanguage: 'indonesian' };
 
     const languages = getLookupLanguages(overrides);
@@ -68,12 +68,12 @@ describe('configuration', () => {
 });
 
 describe('sanitizeAiMeaning', () => {
-  test.each([
+  it.each([
     ['**Arti: pergi** [1]', 'Pergi'], // markdown and label removed, Title Case
     ['arti - pergi', 'Pergi'],
     ['Artikel', 'Artikel'], // a real word starting with "Arti" is kept
     ['Artis', 'Artis'],
-  ])('cleans %p into %p', (raw, expected) => {
+  ])('should clean %p into %p when a meaning is sanitized', (raw, expected) => {
     const meaning = sanitizeAiMeaning(raw);
 
     expect(meaning).toBe(expected);
@@ -81,12 +81,12 @@ describe('sanitizeAiMeaning', () => {
 });
 
 describe('extractMeaningFromResponse', () => {
-  test.each([
+  it.each([
     ['one Google segment', [[['Jepang', '日本', null, null, 1]], null, 'ja'], 'Jepang'],
     ['several Google segments', [[['Saya ', 'a'], ['makan', 'b']]], 'Saya Makan'],
     ['a MyMemory answer', { responseData: { translatedText: 'jepang' } }, 'Jepang'],
     ['an empty answer', {}, ''],
-  ])('reads %s', (_, payload, expected) => {
+  ])('should read the meaning when the response is %s', (_, payload, expected) => {
     const meaning = extractMeaningFromResponse(payload);
 
     expect(meaning).toBe(expected);
@@ -94,7 +94,7 @@ describe('extractMeaningFromResponse', () => {
 });
 
 describe('isEchoTranslation', () => {
-  test.each([
+  it.each([
     ['みぎ', 'Migi', undefined, true],
     ['migi', 'migi', undefined, true],
     ['みぎ', '', undefined, true],
@@ -102,7 +102,7 @@ describe('isEchoTranslation', () => {
     ['右', 'right', undefined, false],
     ['normal', 'Normal', 'de', false], // same spelling is a real meaning between Latin-script languages
     ['bank', '', 'de', true],
-  ])('%p -> %p (from %p) is an echo: %p', (term, meaning, sourceLanguage, expected) => {
+  ])('should report %p -> %p (from %p) as an echo: %p when the translation is checked', (term, meaning, sourceLanguage, expected) => {
     const echo = isEchoTranslation(term, meaning, sourceLanguage);
 
     expect(echo).toBe(expected);
@@ -110,19 +110,19 @@ describe('isEchoTranslation', () => {
 });
 
 describe('lookupWordMeaning', () => {
-  test('keeps kanji as typed and asks Google with the chosen languages', async () => {
+  it('should keep kanji as typed and use the chosen languages when Google is asked', async () => {
     const fetchImpl = jest.fn(async () => json(['Jepang']));
 
     const meaning = await lookupWordMeaning('日本', { sourceLanguage: 'ja', targetLanguage: 'id', fetchImpl });
+    const url = new URL(fetchImpl.mock.calls[0][0]);
 
     expect(meaning).toBe('Jepang');
-    const url = new URL(fetchImpl.mock.calls[0][0]);
     expect(url.hostname).toBe('clients5.google.com');
     expect(url.searchParams.getAll('q')).toEqual(['日本']);
     expect([url.searchParams.get('sl'), url.searchParams.get('tl')]).toEqual(['ja', 'id']);
   });
 
-  test('falls back to MyMemory when Google fails', async () => {
+  it('should use MyMemory when Google fails', async () => {
     const fetchImpl = async (url) => (String(url).includes('mymemory') ? json({ responseData: { translatedText: 'halo' } }) : json({}, 500));
 
     const meaning = await lookupWordMeaning('hello', { fetchImpl });
@@ -130,11 +130,11 @@ describe('lookupWordMeaning', () => {
     expect(meaning).toBe('Halo');
   });
 
-  test.each([
+  it.each([
     ['a blank word', ' ', {}, /Isi kata/],
     ['the same language twice', 'a', { sourceLanguage: 'id', targetLanguage: 'id' }, /sama/],
     ['every service failing', 'hello', { fetchImpl: async () => json({}, 500) }, /gagal/],
-  ])('refuses %s', async (_, term, options, message) => {
+  ])('should refuse the lookup when the problem is %s', async (_, term, options, message) => {
     const lookup = lookupWordMeaning(term, options);
 
     await expect(lookup).rejects.toThrow(message);
@@ -142,7 +142,7 @@ describe('lookupWordMeaning', () => {
 });
 
 describe('translateTerms', () => {
-  test('translates every word on its own, 100 words per request', async () => {
+  it('should translate every word on its own, 100 per request, when many words are translated', async () => {
     const terms = Array.from({ length: 250 }, (_, i) => `word${i}`);
     const { fetchImpl, urls } = fakeServices();
 
@@ -156,7 +156,7 @@ describe('translateTerms', () => {
     expect([urls()[0].searchParams.get('sl'), urls()[0].searchParams.get('tl')]).toEqual(['en', 'id']);
   });
 
-  test('reports progress after each request', async () => {
+  it('should report progress after each request when words are translated in batches', async () => {
     const terms = Array.from({ length: 250 }, (_, i) => `word${i}`);
     const { fetchImpl } = fakeServices();
     const onProgress = jest.fn();
@@ -170,7 +170,7 @@ describe('translateTerms', () => {
     ]);
   });
 
-  test('falls back to the line-based endpoint when the dictionary endpoint fails', async () => {
+  it('should use the line-based endpoint when the dictionary endpoint fails', async () => {
     const { fetchImpl, urls } = fakeServices({ dictDown: true });
 
     const result = await translateTerms(['a1', 'b2', 'c3'], { sourceLanguage: 'en', targetLanguage: 'id', fetchImpl });
@@ -180,7 +180,7 @@ describe('translateTerms', () => {
     expect(urls()[1].searchParams.get('q')).toBe('a1\nb2\nc3');
   });
 
-  test('keeps the results it has and reports a failed request', async () => {
+  it('should keep the results it has and report the failure when a request fails', async () => {
     const terms = Array.from({ length: 150 }, (_, i) => `w${i}`);
     const { fetchImpl } = fakeServices({ failAfter: 1 });
 
@@ -192,7 +192,7 @@ describe('translateTerms', () => {
     expect(result.error).toMatch(/HTTP 429/);
   });
 
-  test('refuses to translate into the same language', async () => {
+  it('should refuse to translate when both languages are the same', async () => {
     const { fetchImpl } = fakeServices();
 
     const result = await translateTerms(['x'], { sourceLanguage: 'en', targetLanguage: 'en', fetchImpl });
@@ -202,7 +202,7 @@ describe('translateTerms', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  test('translates hiragana words Google does not recognise through their kanji spelling', async () => {
+  it('should translate through the kanji spelling when Google does not recognise a hiragana word', async () => {
     const { fetchImpl, urls } = fakeServices({
       dictionary: { みぎ: 'kanan', ひだり: null, 左: 'kiri', はし: null, 橋: 'jembatan' },
       candidates: { ひだり: ['左', 'ひだり'], はし: ['橋', '箸', 'はし'] },
@@ -221,7 +221,7 @@ describe('translateTerms', () => {
     expect(urls()[3].searchParams.getAll('q')).toEqual(['左', '橋']);
   });
 
-  test('tries a word still blank after the batches on its own, ending with MyMemory', async () => {
+  it('should try the word alone, ending with MyMemory, when it is still blank after the batches', async () => {
     const fetchImpl = jest.fn(async (url) => {
       const parsed = new URL(url);
       if (parsed.hostname === 'api.mymemory.translated.net') return json({ responseData: { translatedText: 'halo' } });
@@ -232,13 +232,13 @@ describe('translateTerms', () => {
     });
 
     const result = await translateTerms(['hello', 'cat'], { sourceLanguage: 'en', targetLanguage: 'id', fetchImpl });
+    const dictionaryCalls = fetchImpl.mock.calls.filter(([url]) => new URL(url).hostname === 'clients5.google.com');
 
     expect(result.meanings).toEqual(['Halo', 'T:cat']);
-    const dictionaryCalls = fetchImpl.mock.calls.filter(([url]) => new URL(url).hostname === 'clients5.google.com');
     expect(dictionaryCalls).toHaveLength(2); // the batch, then "hello" on its own
   });
 
-  test('keeps a Latin-script meaning spelled like the word, without retrying', async () => {
+  it('should keep the meaning without retrying when a Latin-script meaning is spelled like the word', async () => {
     const { fetchImpl } = fakeServices({ dictionary: { normal: 'normal', bank: 'bank', Strand: 'beach' } });
 
     const result = await translateTerms(['normal', 'bank', 'Strand'], { sourceLanguage: 'de', targetLanguage: 'en', fetchImpl });

@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanText, levenshtein, normalizeText, titleText, toTitleCase } from '../../lib/text.js';
 import { createSeededRng, shuffle } from '../../lib/random.js';
 import { detectDelimiter, parseDelimited } from '../../lib/csv.js';
@@ -35,12 +35,12 @@ function readPart(bytes, name) {
 }
 
 describe('cleanText', () => {
-  test.each([
+  it.each([
     ['  a \n  b\t c ', 'a b c'],
     [null, ''],
     [0, '0'],
     [false, 'false'],
-  ])('cleanText(%p) is %p', (input, expected) => {
+  ])('should turn %p into %p when cleanText runs', (input, expected) => {
     const result = cleanText(input);
 
     expect(result).toBe(expected);
@@ -48,7 +48,7 @@ describe('cleanText', () => {
 });
 
 describe('normalizeText', () => {
-  test.each([
+  it.each([
     ['Café, au LAIT!', 'cafe au lait'],
     ["don't", 'dont'],
     ['  Hello   World ', 'hello world'],
@@ -56,26 +56,38 @@ describe('normalizeText', () => {
     [0, '0'],
     [false, 'false'],
     [undefined, ''],
-  ])('ignores case, accents and punctuation: %p -> %p', (input, expected) => {
+  ])('should ignore case, accents and punctuation when %p becomes %p', (input, expected) => {
     const result = normalizeText(input);
 
     expect(result).toBe(expected);
   });
+
+  it.each([
+    ['まだ', 'また'],
+    ['ガ', 'カ'],
+    ['パン', 'ハン'],
+    ['ぶた', 'ふた'],
+  ])('should keep the dakuten when %s is compared with %s', (voiced, plain) => {
+    const keys = [normalizeText(voiced), normalizeText(plain)];
+
+    expect(keys[0]).toBe(voiced);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
 });
 
 describe('Title Case', () => {
-  test.each([
+  it.each([
     ['terima kasih ', 'Terima Kasih '], // spaces are kept while typing
     ['tumbuh subur, berkembang', 'Tumbuh Subur, Berkembang'],
     ['l\'eau / "quoted"', 'L\'eau / "Quoted"'],
     ['みぎ', 'みぎ'],
-  ])('toTitleCase(%p) is %p', (text, expected) => {
+  ])('should turn %p into %p when toTitleCase runs', (text, expected) => {
     const result = toTitleCase(text);
 
     expect(result).toBe(expected);
   });
 
-  test('titleText also tidies the spaces', () => {
+  it('should tidy the spaces when titleText formats a value', () => {
     const text = '  café  au   lait ';
 
     const result = titleText(text);
@@ -85,11 +97,11 @@ describe('Title Case', () => {
 });
 
 describe('levenshtein', () => {
-  test.each([
+  it.each([
     ['kitten', 'sitting', 3],
     ['abc', 'abc', 0],
     ['', 'abc', 3],
-  ])('distance between %p and %p is %p', (a, b, expected) => {
+  ])('should measure %p and %p as %p apart when levenshtein runs', (a, b, expected) => {
     const distance = levenshtein(a, b);
 
     expect(distance).toBe(expected);
@@ -97,7 +109,7 @@ describe('levenshtein', () => {
 });
 
 describe('shuffle', () => {
-  test('keeps every item and does not change the input', () => {
+  it('should keep every item and not change the input when a list is shuffled', () => {
     const input = [1, 2, 3, 4, 5, 6];
 
     const result = shuffle(input, createSeededRng(7));
@@ -106,7 +118,7 @@ describe('shuffle', () => {
     expect(input).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
-  test('gives the same order for the same seed', () => {
+  it('should give the same order when the seed is the same', () => {
     const input = [1, 2, 3, 4, 5, 6];
 
     const first = shuffle(input, createSeededRng(7));
@@ -117,14 +129,14 @@ describe('shuffle', () => {
 });
 
 describe('detectDelimiter', () => {
-  test.each([
+  it.each([
     ['a,b,c\n1,2,3', ','],
     ['a;b;c\n1;2;3', ';'],
     ['a\tb\tc\n1\t2\t3', '\t'],
     ['single', ','],
     ['"a,b";c\n"d,e";f', ';'],
     ['a,b;c', ','],
-  ])('picks the delimiter of %p', (text, expected) => {
+  ])('should pick the delimiter when the text is %p', (text, expected) => {
     const delimiter = detectDelimiter(text);
 
     expect(delimiter).toBe(expected);
@@ -132,7 +144,7 @@ describe('detectDelimiter', () => {
 });
 
 describe('parseDelimited', () => {
-  test('handles quotes, escaped quotes, CRLF and a byte order mark', () => {
+  it('should handle quotes, escaped quotes, CRLF and a byte order mark when CSV is parsed', () => {
     const text = '﻿Kata,Arti\r\n"hello, world","say ""hi"""\r\nplain,text\r\n\r\n';
 
     const rows = parseDelimited(text);
@@ -144,7 +156,7 @@ describe('parseDelimited', () => {
     ]);
   });
 
-  test('keeps newlines inside quoted cells and drops blank rows', () => {
+  it('should keep newlines in quoted cells and drop blank rows when CSV is parsed', () => {
     const text = 'a;"line1\nline2"\n;\nb;c';
 
     const rows = parseDelimited(text);
@@ -155,7 +167,7 @@ describe('parseDelimited', () => {
     ]);
   });
 
-  test('reads pasted tab-separated text', () => {
+  it('should read the rows when the text is tab-separated', () => {
     const text = 'apple\tapel\nbook\tbuku';
 
     const rows = parseDelimited(text);
@@ -166,7 +178,7 @@ describe('parseDelimited', () => {
     ]);
   });
 
-  test('treats a quote inside a cell as a normal character', () => {
+  it('should treat a quote as a normal character when it is inside a cell', () => {
     const text = 'hi"there,now';
 
     const rows = parseDelimited(text, ',');
@@ -176,17 +188,17 @@ describe('parseDelimited', () => {
 });
 
 describe('xlsx helpers', () => {
-  test.each([
+  it.each([
     [0, 'A'],
     [25, 'Z'],
     [26, 'AA'],
-  ])('column %p is %p', (index, expected) => {
+  ])('should name column %p as %p when columnLetter runs', (index, expected) => {
     const letter = columnLetter(index);
 
     expect(letter).toBe(expected);
   });
 
-  test('crc32 matches the known check value', () => {
+  it('should match the known check value when crc32 runs', () => {
     const bytes = new TextEncoder().encode('123456789');
 
     const checksum = crc32(bytes);
@@ -194,7 +206,7 @@ describe('xlsx helpers', () => {
     expect(checksum).toBe(0xcbf43926);
   });
 
-  test('createZip writes a readable archive with correct CRCs', () => {
+  it('should write a readable archive with correct CRCs when createZip runs', () => {
     const encoder = new TextEncoder();
     const files = [
       { name: 'a.txt', data: encoder.encode('hello') },
@@ -205,12 +217,12 @@ describe('xlsx helpers', () => {
 
     expect(entries.map((entry) => entry.name)).toEqual(['a.txt', 'dir/b.txt']);
     expect(new TextDecoder().decode(entries[1].data)).toBe('wörld');
-    for (const entry of entries) expect(crc32(entry.data)).toBe(entry.crc);
+    expect(entries.map((entry) => crc32(entry.data))).toEqual(entries.map((entry) => entry.crc));
   });
 });
 
 describe('buildXlsx', () => {
-  test('contains every workbook part', () => {
+  it('should contain every workbook part when a workbook is built', () => {
     const rows = [['Kata', 'Arti']];
 
     const entries = readZipEntries(buildXlsx(rows, { sheetName: 'Kosakata' }));
@@ -225,7 +237,7 @@ describe('buildXlsx', () => {
     ]);
   });
 
-  test('escapes cell text and never writes formulas', () => {
+  it('should escape cell text and never write formulas when cells are written', () => {
     const rows = [['Kata', 'Arti'], ['a & <b>', '=SUM(1,2)']];
 
     const sheet = readPart(buildXlsx(rows, { sheetName: 'Kosakata' }), 'xl/worksheets/sheet1.xml');
@@ -235,7 +247,7 @@ describe('buildXlsx', () => {
     expect(sheet).not.toMatch(/<f>/);
   });
 
-  test('writes column widths and skips empty cells', () => {
+  it('should write column widths and skip empty cells when a sheet is built', () => {
     const rows = [['', 'keep'], ['value', '']];
 
     const sheet = readPart(buildXlsx(rows, { sheetName: 'bad/?:[]*name', columnWidths: [12, 30] }), 'xl/worksheets/sheet1.xml');
@@ -244,7 +256,7 @@ describe('buildXlsx', () => {
     expect(sheet).toMatch(/<row r="2">/);
   });
 
-  test('removes characters Excel does not allow in a sheet name', () => {
+  it('should remove characters Excel does not allow when the sheet is named', () => {
     const rows = [['a']];
 
     const workbook = readPart(buildXlsx(rows, { sheetName: 'bad/?:[]*name' }), 'xl/workbook.xml');
@@ -252,7 +264,7 @@ describe('buildXlsx', () => {
     expect(workbook).not.toMatch(/bad\/\?:\[\]\*name/);
   });
 
-  test('falls back to "Sheet1" for an empty sheet name', () => {
+  it('should use "Sheet1" when the sheet name is empty', () => {
     const rows = [['\u0001value', null], [null, '\u0008text']];
 
     const workbook = readPart(buildXlsx(rows, { sheetName: '' }), 'xl/workbook.xml');
@@ -261,7 +273,7 @@ describe('buildXlsx', () => {
     expect(workbook).not.toMatch(/<sheet name=""/);
   });
 
-  test('keeps 0 and false as text', () => {
+  it('should keep 0 and false as text when cells hold them', () => {
     const rows = [[0, false], [false, 0]];
 
     const sheet = readPart(buildXlsx(rows, { sheetName: 'Sheet 2' }), 'xl/worksheets/sheet1.xml');
@@ -272,16 +284,20 @@ describe('buildXlsx', () => {
 });
 
 describe('createId', () => {
-  test('falls back when crypto is unavailable', () => {
-    const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  let original;
+
+  beforeEach(() => {
+    original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
     Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true, writable: true });
+  });
 
-    try {
-      const id = createId();
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'crypto', original);
+  });
 
-      expect(id).toMatch(/^[a-z0-9-]+$/i);
-    } finally {
-      Object.defineProperty(globalThis, 'crypto', original);
-    }
+  it('should use a fallback when crypto is unavailable', () => {
+    const id = createId();
+
+    expect(id).toMatch(/^[a-z0-9-]+$/i);
   });
 });

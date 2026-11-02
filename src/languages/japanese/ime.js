@@ -12,8 +12,8 @@ import { lookupKanjiFallback } from './fallbackDictionary.js';
  * reached, a small offline dictionary plus kana conversion keeps it working.
  */
 
-export const GOOGLE_INPUT_TOOLS_URL = 'https://inputtools.google.com/request';
-export const MAX_CANDIDATES = 9;
+const GOOGLE_INPUT_TOOLS_URL = 'https://inputtools.google.com/request';
+const MAX_CANDIDATES = 9;
 
 const COMPOSITION_RE = /[A-Za-z][A-Za-z'-]*$/;
 const ALL_KANA_RE = /^[぀-ヿー]+$/;

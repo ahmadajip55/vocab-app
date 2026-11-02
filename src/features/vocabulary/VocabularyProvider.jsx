@@ -10,6 +10,7 @@ import {
   loadSettings,
   programWordsKey,
   removeStoredWords,
+  replaceStoredPrograms,
   savePrograms,
   saveSettings,
   saveWords,
@@ -141,11 +142,23 @@ export function ProgramsProvider({ children, storage }) {
       removeProgram(id) {
         dispatch({ type: 'program/removed', id });
       },
-      /** Replaces every program, word and setting, e.g. with a restored backup (see parseBackup). */
+      /**
+       * Replaces every program, word and setting, e.g. with a restored backup (see parseBackup).
+       * Returns 'saved', 'too-large' (nothing changed: it does not fit in the browser storage)
+       * or 'unavailable' (restored for this visit only).
+       */
       replaceAll({ programs, wordsByProgram, settings: nextSettings }) {
+        const result = replaceStoredPrograms({ programs, wordsByProgram }, storage);
+        if (result === 'too-large') return result;
+        if (result === 'saved') {
+          // Already written, so the next save has nothing to rewrite.
+          savedProgramsRef.current = programs;
+          savedWordsRef.current = { ...wordsByProgram };
+        }
         dispatch({ type: 'programs/replaced', programs, wordsByProgram });
         setSettings(cleanSettings(nextSettings));
         saveSettings(nextSettings, storage);
+        return result;
       },
     }),
     [storage],

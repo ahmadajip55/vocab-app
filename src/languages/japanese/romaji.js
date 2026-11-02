@@ -81,7 +81,7 @@ export function extendReadings(readings, prefix, romajiTyped, nextText) {
   return { ...readings, [nextText]: `${prefixReading}${romajiTyped.toLowerCase()}` };
 }
 
-export const GOOGLE_ROMANIZE_URL = 'https://translate.googleapis.com/translate_a/single';
+const GOOGLE_ROMANIZE_URL = 'https://translate.googleapis.com/translate_a/single';
 
 /**
  * Romanization from Google Translate for one word (`dt=rm`). It is only used

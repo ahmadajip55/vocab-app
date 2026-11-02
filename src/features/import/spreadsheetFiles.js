@@ -1,6 +1,6 @@
 import { buildXlsx } from '../../lib/xlsx.js';
 
-export const HEADER_ROW = ['Word', 'Meaning'];
+const HEADER_ROW = ['Word', 'Meaning'];
 
 const TEMPLATE_EXAMPLES = [
   ['reluctant', 'enggan, berat hati'],

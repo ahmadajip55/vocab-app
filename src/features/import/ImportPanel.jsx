@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, ButtonLink } from '../../components/Button.jsx';
+import { CollapsibleCard } from '../../components/CollapsibleCard.jsx';
 import { SelectField, TextField } from '../../components/Fields.jsx';
 import { getLanguage } from '../../languages/index.js';
 import { spellWithKanji } from '../../languages/japanese/kanji.js';
@@ -236,10 +237,7 @@ export function ImportPanel() {
 
       <div className="row g-4 align-items-start">
         <div className="col-md-6">
-          <section className="card card-body vstack gap-3" aria-labelledby="upload-title">
-            <h2 id="upload-title" className="h5 mb-0">
-              2. Upload a file
-            </h2>
+          <CollapsibleCard title="2. Upload a file" storageKey="vocab-app:import-upload-open">
             <p className="small text-body-secondary mb-0">
               Excel (.xlsx) or CSV with one column per field: <strong>Word</strong> and <strong>Meaning</strong>. Without
               a header row, column A is the word and column B its meaning. Empty meanings are looked up online when the
@@ -264,31 +262,30 @@ export function ImportPanel() {
                 Download Excel template
               </Button>
             </div>
-          </section>
+          </CollapsibleCard>
         </div>
 
         <div className="col-md-6">
-          <form className="card card-body vstack gap-3" onSubmit={handlePaste} aria-labelledby="paste-title">
-            <h2 id="paste-title" className="h5 mb-0">
-              2. Or paste text
-            </h2>
-            <TextField
-              as="textarea"
-              label="Text"
-              rows={6}
-              value={pasted}
-              onChange={(event) => setPasted(event.target.value)}
-              hint={`One word per line: the word, a comma, then its meaning. Commas after the first one stay in the meaning. Leave the meaning out to have it translated when you check. Up to ${IMPORT_LIMITS.maxPastedRows} words.`}
-              placeholder={'persuade, membujuk\nthrive, tumbuh subur, berkembang\ndeadline'}
-              spellCheck={false}
-              disabled={!languageChosen || busy}
-            />
-            <div className="d-flex flex-wrap align-items-center gap-2">
-              <Button type="submit" disabled={!languageChosen || busy}>
-                {status === 'translating' ? 'Checking…' : 'Check text'}
-              </Button>
-            </div>
-          </form>
+          <CollapsibleCard title="2. Or paste text" storageKey="vocab-app:import-paste-open">
+            <form className="vstack gap-3" onSubmit={handlePaste} aria-label="Paste text">
+              <TextField
+                as="textarea"
+                label="Text"
+                rows={6}
+                value={pasted}
+                onChange={(event) => setPasted(event.target.value)}
+                hint={`One word per line: the word, a comma, then its meaning. Commas after the first one stay in the meaning. Leave the meaning out to have it translated when you check. Up to ${IMPORT_LIMITS.maxPastedRows} words.`}
+                placeholder={'persuade, membujuk\nthrive, tumbuh subur, berkembang\ndeadline'}
+                spellCheck={false}
+                disabled={!languageChosen || busy}
+              />
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <Button type="submit" disabled={!languageChosen || busy}>
+                  {status === 'translating' ? 'Checking…' : 'Check text'}
+                </Button>
+              </div>
+            </form>
+          </CollapsibleCard>
         </div>
       </div>
 

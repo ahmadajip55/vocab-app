@@ -1,6 +1,6 @@
 import { parseDelimited } from '../../lib/csv.js';
 
-export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_EXTENSIONS = ['xlsx', 'csv', 'tsv', 'txt'];
 
 /**

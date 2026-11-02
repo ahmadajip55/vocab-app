@@ -64,6 +64,54 @@ body {
   z-index: 1080;
 }
 
+/* Card header that shows or hides the card (CollapsibleCard). */
+.collapsible-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: var(--bs-card-spacer-y) var(--bs-card-spacer-x);
+  border: 0;
+  border-radius: var(--bs-card-inner-border-radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+.collapsible-toggle:hover {
+  background-color: var(--bs-tertiary-bg);
+}
+.collapsible-toggle:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+.collapsible-toggle__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--bs-body-font-family);
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--bs-secondary-color);
+}
+.collapsible-toggle__chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-25%) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.collapsible-toggle[aria-expanded='true'] .collapsible-toggle__chevron {
+  transform: translateY(25%) rotate(-135deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-toggle__chevron {
+    transition: none;
+  }
+}
+
 /* Small progress bars next to a word (mastery, quiz). */
 .mini-progress {
   width: 56px;
@@ -85,6 +133,12 @@ body {
   font-weight: 400;
   letter-spacing: 0;
   color: var(--bs-secondary-color);
+}
+.jp-reading--small {
+  margin-top: 0.125rem;
+  font-size: 0.875rem;
+  color: inherit; /* stays readable on a green or red answer button */
+  opacity: 0.75;
 }
 
 .quiz-prompt {

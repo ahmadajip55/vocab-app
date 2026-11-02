@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { detectColumns } from '../../../features/import/columns.js';
 import { IMPORT_LIMITS, parsePastedText, rowsToWords } from '../../../features/import/parseVocabularyRows.js';
 import { planImport } from '../../../features/import/planImport.js';
@@ -10,12 +10,12 @@ const lines = (count) => Array.from({ length: count }, (_, i) => `word${i}, arti
 const PASTE_LIMITS = { maxRows: IMPORT_LIMITS.maxPastedRows, source: 'Teks ini' };
 
 describe('detectColumns', () => {
-  test.each([
+  it.each([
     [['Arti', 'Kata', 'Kategori'], { term: 1, meaning: 0 }],
     [['Word', 'Translation', 'Example Sentence'], { term: 0, meaning: 1 }],
     [['Word', 'Meaning result'], { term: 0, meaning: 1 }],
     [['apple', 'apel'], {}],
-  ])('matches Indonesian and English headers in any order: %j', (header, expected) => {
+  ])('should match the columns when the headers are %j', (header, expected) => {
     const columns = detectColumns(header);
 
     expect(columns).toEqual(expected);
@@ -23,7 +23,7 @@ describe('detectColumns', () => {
 });
 
 describe('rowsToWords', () => {
-  test('reads a header row and reports spreadsheet row numbers', () => {
+  it('should report spreadsheet row numbers when the file has a header row', () => {
     const rows = [
       ['Kata', 'Arti', 'Contoh', 'Kategori'],
       ['reluctant', 'enggan', 'She was reluctant.', 'Sehari-hari'],
@@ -42,7 +42,7 @@ describe('rowsToWords', () => {
     ]);
   });
 
-  test('works with reordered columns and ignores unknown ones', () => {
+  it('should ignore unknown columns when the columns are reordered', () => {
     const rows = [
       ['No', 'Arti', 'Kata'],
       [1, 'apel', 'apple'],
@@ -53,7 +53,7 @@ describe('rowsToWords', () => {
     expect(pairs(result.words)).toEqual([['apple', 'apel']]);
   });
 
-  test('without a header, column A is the word and column B its meaning', () => {
+  it('should read column A as the word and column B as the meaning when there is no header', () => {
     const rows = [
       ['apple', 'apel', 'An apple a day.', 'Buah'],
       ['book', 'buku'],
@@ -68,7 +68,7 @@ describe('rowsToWords', () => {
     ]);
   });
 
-  test('flags incomplete and oversized rows without stopping', () => {
+  it('should flag the row and keep going when a row is incomplete or too long', () => {
     const rows = [
       ['Kata', 'Arti'],
       ['only term', ''],
@@ -85,7 +85,7 @@ describe('rowsToWords', () => {
     expect(result.issues[1].reason).toMatch(/terlalu panjang/);
   });
 
-  test('flags a meaning that is too long', () => {
+  it('should flag the row when the meaning is too long', () => {
     const rows = [['Word', 'Meaning'], ['cat', 'kucing'], ['dog', 'x'.repeat(401)]];
 
     const result = rowsToWords(rows);
@@ -93,7 +93,7 @@ describe('rowsToWords', () => {
     expect(result.issues[0].reason).toMatch(/Arti terlalu panjang/);
   });
 
-  test.each([
+  it.each([
     ['an empty file', [], /tidak berisi data/],
     ['a header without a word column', [['Arti', 'Contoh'], ['a', 'b']], /kolom "Kata"/],
     ['only a header row', [['Kata', 'Arti']], /Hanya ada baris judul/],
@@ -102,13 +102,13 @@ describe('rowsToWords', () => {
       [['Kata', 'Arti'], ...Array.from({ length: IMPORT_LIMITS.maxRows + 1 }, (_, i) => [`w${i}`, 'm'])],
       /Maksimal/,
     ],
-  ])('gives a clear fatal error for %s', (_, rows, message) => {
+  ])('should give a clear fatal error when the file is %s', (_, rows, message) => {
     const result = rowsToWords(rows);
 
     expect(result.fatal).toMatch(message);
   });
 
-  test('converts numbers and dates to text', () => {
+  it('should convert the cells to text when they hold numbers or dates', () => {
     const rows = [['Kata'], [2024, new Date('2024-05-06T00:00:00Z')]];
 
     const [word] = rowsToWords(rows).words;
@@ -116,7 +116,7 @@ describe('rowsToWords', () => {
     expect([word.term, word.meaning]).toEqual(['2024', '']);
   });
 
-  test('reads tab-separated text copied from a spreadsheet', () => {
+  it('should read the rows when the text is tab-separated', () => {
     const rows = parseDelimited('Kata\tArti\napple\tapel\nbook\tbuku');
 
     const result = rowsToWords(rows);
@@ -126,7 +126,7 @@ describe('rowsToWords', () => {
 });
 
 describe('parsePastedText', () => {
-  test('reads "word, meaning" per line; later commas stay in the meaning', () => {
+  it('should keep later commas in the meaning when a line is "word, meaning"', () => {
     const text = 'persuade, membujuk\nthrive, tumbuh subur, berkembang\n"well, then", baiklah\n\nalone\n';
 
     const rows = parsePastedText(text);
@@ -139,7 +139,7 @@ describe('parsePastedText', () => {
     ]);
   });
 
-  test('pasted rows become words, a line without a meaning included', () => {
+  it('should turn every line into a word when some lines have no meaning', () => {
     const rows = parsePastedText('persuade, membujuk\nthrive, tumbuh subur, berkembang\nalone');
 
     const result = rowsToWords(rows);
@@ -152,7 +152,7 @@ describe('parsePastedText', () => {
     ]);
   });
 
-  test('recognises a header line', () => {
+  it('should skip the header when the first line is a header', () => {
     const rows = parsePastedText('Word, Meaning\ncat, kucing');
 
     const result = rowsToWords(rows);
@@ -162,7 +162,7 @@ describe('parsePastedText', () => {
 });
 
 describe('pasted text limit', () => {
-  test('is 100 words', () => {
+  it('should be 100 words when text is pasted', () => {
     const limits = IMPORT_LIMITS;
 
     const max = limits.maxPastedRows;
@@ -170,10 +170,10 @@ describe('pasted text limit', () => {
     expect(max).toBe(100);
   });
 
-  test.each([
+  it.each([
     ['100 words', lines(100)],
     ['100 words under a header line', `Word, Meaning\n${lines(100)}`],
-  ])('accepts %s', (_, text) => {
+  ])('should accept the text when it has %s', (_, text) => {
     const rows = parsePastedText(text);
 
     const result = rowsToWords(rows, PASTE_LIMITS);
@@ -181,7 +181,7 @@ describe('pasted text limit', () => {
     expect(result.words).toHaveLength(100);
   });
 
-  test('refuses 101 words', () => {
+  it('should refuse the text when it has 101 words', () => {
     const rows = parsePastedText(lines(101));
 
     const result = rowsToWords(rows, PASTE_LIMITS);
@@ -189,7 +189,7 @@ describe('pasted text limit', () => {
     expect(result.fatal).toBe('Maksimal 100 kata per impor. Teks ini berisi 101 kata.');
   });
 
-  test('does not apply to a file of the same size', () => {
+  it('should not apply when a file has the same number of rows', () => {
     const rows = parsePastedText(lines(101));
 
     const result = rowsToWords(rows);
@@ -199,7 +199,7 @@ describe('pasted text limit', () => {
 });
 
 describe('planImport', () => {
-  test('skips words that exist or repeat in the file', () => {
+  it('should skip a word when it exists or repeats in the file', () => {
     const parsed = rowsToWords([
       ['Kata', 'Arti'],
       ['Apple', 'apel'],
@@ -217,10 +217,19 @@ describe('planImport', () => {
     ]);
   });
 
-  test.each([
+  it('should import mada (まだ) when mata (また) already exists', () => {
+    const parsed = rowsToWords([['Word', 'Meaning'], ['まだ', 'belum']]).words;
+
+    const plan = planImport(parsed, [{ term: 'また' }]);
+
+    expect(plan.toAdd.map((word) => word.term)).toEqual(['まだ']);
+    expect(plan.duplicates).toEqual([]);
+  });
+
+  it.each([
     [undefined, ['apple']], // default meaning language: Indonesian
     ['en', ['book']],
-  ])('with meaning language %p, a word only exists when its meaning language matches', (meaningLanguage, expected) => {
+  ])('should only find an existing word when its meaning language matches %p', (meaningLanguage, expected) => {
     const parsed = rowsToWords([['Word'], ['apple'], ['book']]).words;
     const existing = [
       { term: 'apple', meaningLanguage: 'en' },
@@ -232,7 +241,7 @@ describe('planImport', () => {
     expect(plan.toAdd.map((word) => word.term)).toEqual(expected);
   });
 
-  test('gives every planned word the chosen meaning language', () => {
+  it('should give every planned word the chosen meaning language when the plan is made', () => {
     const parsed = rowsToWords([['Word', 'Meaning'], ['cat', 'kucing']]).words;
 
     const plan = planImport(parsed, [], 'ja');
@@ -240,7 +249,7 @@ describe('planImport', () => {
     expect(plan.toAdd.map((word) => [word.term, word.meaning, word.meaningLanguage])).toEqual([['cat', 'kucing', 'ja']]);
   });
 
-  test('a word turned into kanji exists when its kanji or its reading is in the list', () => {
+  it('should find an existing word when its kanji or its reading is in the list', () => {
     const words = [
       { row: 2, term: '右', reading: 'みぎ', meaning: '' },
       { row: 3, term: '猫', reading: 'ねこ', meaning: '' },
@@ -264,10 +273,10 @@ describe('planImport', () => {
 });
 
 describe('spreadsheet files', () => {
-  test.each([
+  it.each([
     ['the template', () => buildTemplateXlsx()],
     ['an export', () => buildWordsXlsx([{ term: 'a', meaning: 'b' }])],
-  ])('%s is a non-empty zip file', (_, build) => {
+  ])('should write a non-empty zip file when building %s', (_, build) => {
     const bytes = build();
 
     expect([bytes[0], bytes[1]]).toEqual([0x50, 0x4b]); // "PK"

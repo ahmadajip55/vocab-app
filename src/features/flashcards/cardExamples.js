@@ -1,7 +1,7 @@
 import { translateSentences } from '../vocabulary/aiMeaning.js';
 import { findExamples } from '../vocabulary/examples.js';
 
-export const EXAMPLES_PER_CARD = 3;
+const EXAMPLES_PER_CARD = 3;
 
 // One lookup per word and language pair for the whole session; a failed one is retried next time.
 const cache = new Map();

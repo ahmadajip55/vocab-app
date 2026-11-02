@@ -4,7 +4,7 @@ import { SelectField } from '../../components/Fields.jsx';
 import { getLanguage } from '../../languages/index.js';
 import { meaningLanguagesOf } from '../vocabulary/model.js';
 
-const COUNT_OPTIONS = [5, 10, 20, 'all'];
+const COUNT_OPTIONS = [5, 10, 20, 30, 50, 75, 100, 'all'];
 
 export function QuizSetup({ words, onStart }) {
   const languages = useMemo(() => meaningLanguagesOf(words), [words]);
