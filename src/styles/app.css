@@ -35,6 +35,14 @@ body {
   --bs-navbar-color: var(--bs-link-color);
   --bs-navbar-hover-color: var(--bs-link-hover-color);
 }
+/* Light/dark switch in the header: a square icon button as tall as the hamburger. */
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
 /* navbar-nav would otherwise darken the text of the active pill. */
 .app-navbar .nav-pills .nav-link.active {
   color: var(--bs-nav-pills-link-active-color);
