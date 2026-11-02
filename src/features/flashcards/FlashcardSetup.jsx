@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '../../components/Button.jsx';
 import { CheckboxField, SelectField } from '../../components/Fields.jsx';
+import { useTargets } from '../../hooks/useTargets.js';
 import { getLanguage } from '../../languages/index.js';
 import { meaningLanguagesOf, selectWords } from './deck.js';
 
@@ -13,7 +14,10 @@ export function FlashcardSetup({ words, onStart }) {
     shuffle: true,
     onlyUnmastered: false,
   }));
-  const count = useMemo(() => selectWords(words, settings).length, [words, settings]);
+  // "Only not mastered" uses the program's mastery target.
+  const targets = useTargets();
+  const deckSettings = useMemo(() => ({ ...settings, targets }), [settings, targets]);
+  const count = useMemo(() => selectWords(words, deckSettings).length, [words, deckSettings]);
 
   const update = (field, value) => setSettings((current) => ({ ...current, [field]: value }));
 
@@ -24,7 +28,7 @@ export function FlashcardSetup({ words, onStart }) {
         event.preventDefault();
         if (count === 0 || starting) return;
         setStarting(true);
-        Promise.resolve(onStart(settings)).finally(() => setStarting(false));
+        Promise.resolve(onStart(deckSettings)).finally(() => setStarting(false));
       }}
     >
       <h2 className="h5 mb-0">Set up study session</h2>

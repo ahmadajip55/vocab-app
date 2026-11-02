@@ -13,6 +13,7 @@ const WordsPage = lazy(() => import('../pages/WordsPage.jsx'));
 const ImportPage = lazy(() => import('../pages/ImportPage.jsx'));
 const FlashcardsPage = lazy(() => import('../pages/FlashcardsPage.jsx'));
 const QuizPage = lazy(() => import('../pages/QuizPage.jsx'));
+const BackupPage = lazy(() => import('../pages/BackupPage.jsx'));
 
 const PAGES = { words: WordsPage, import: ImportPage, flashcards: FlashcardsPage, quiz: QuizPage };
 
@@ -39,6 +40,7 @@ export default function App() {
                 <Route key={section.alias} path={section.alias} element={<Navigate to={`/${section.path}`} replace />} />,
               ];
             })}
+            <Route path="backup" element={<BackupPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

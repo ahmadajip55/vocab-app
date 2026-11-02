@@ -134,13 +134,13 @@ export function FlashcardSession({ deck, onResult, onRestart, onExit, onRomaji }
         </div>
         <div className="col-6">
           <Button variant="primary" className="btn-lg w-100" onClick={() => answer(true)}>
-            Mastered
+            Mastery
           </Button>
         </div>
       </div>
 
       <p className="small text-body-secondary d-flex flex-wrap align-items-center gap-1 mb-0">
-        <kbd>Space</kbd> flip · <kbd>←</kbd> not mastered · <kbd>→</kbd> mastered
+        <kbd>Space</kbd> flip · <kbd>←</kbd> not mastered · <kbd>→</kbd> mastery
       </p>
     </div>
   );

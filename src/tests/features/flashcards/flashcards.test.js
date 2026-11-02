@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import { createWord, MASTERED_LEVEL } from '../../../features/vocabulary/model.js';
+import { createWord, DEFAULT_TARGETS } from '../../../features/vocabulary/model.js';
 import { createSeededRng } from '../../../lib/random.js';
 import { buildDeck, meaningLanguagesOf, selectWords } from '../../../features/flashcards/deck.js';
 import { clearCardExamples, loadCardExamples } from '../../../features/flashcards/cardExamples.js';
@@ -17,7 +17,7 @@ function sessionAfter(ids, answers) {
 
 describe('selectWords', () => {
   test('keeps the list order (words are stored in Title Case)', () => {
-    const words = [word('a'), word('b', { mastery: MASTERED_LEVEL }), word('c', { mastery: 1 })];
+    const words = [word('a'), word('b', { mastery: DEFAULT_TARGETS.mastered }), word('c', { mastery: 1 })];
 
     const selected = selectWords(words, {});
 
@@ -25,18 +25,26 @@ describe('selectWords', () => {
   });
 
   test('can skip mastered words', () => {
-    const words = [word('a'), word('b', { mastery: MASTERED_LEVEL }), word('c', { mastery: 1 })];
+    const words = [word('a'), word('b', { mastery: DEFAULT_TARGETS.mastered }), word('c', { mastery: 1 })];
 
     const selected = selectWords(words, { onlyUnmastered: true });
 
     expect(selected.map((w) => w.term)).toEqual(['A', 'C']);
   });
 
+  test('a custom mastered target decides which words are mastered', () => {
+    const words = [word('a', { mastery: 5 }), word('b', { mastery: 4 })];
+
+    const selected = selectWords(words, { onlyUnmastered: true, targets: { mastered: 5, passed: 100 } });
+
+    expect(selected.map((w) => w.term)).toEqual(['B']);
+  });
+
   describe('by meaning language', () => {
     const words = [
       word('A', { meaningLanguage: 'id' }),
       word('A', { meaningLanguage: 'en' }),
-      word('B', { meaningLanguage: 'id', mastery: MASTERED_LEVEL }),
+      word('B', { meaningLanguage: 'id', mastery: DEFAULT_TARGETS.mastered }),
     ];
 
     test.each([

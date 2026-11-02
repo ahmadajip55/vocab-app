@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/import', label: 'Import' },
   { to: '/flashcards', label: 'Flashcards' },
   { to: '/quiz', label: 'Quiz' },
+  { to: '/backup', label: 'Backup' },
 ];
 
 export function AppShell() {
@@ -68,8 +69,8 @@ export function AppShell() {
       <main id="main" className="container-fluid app-container vstack gap-4 py-4 pb-5">
         {persistFailed ? (
           <p className="alert alert-warning mb-0" role="status">
-            Browser storage is unavailable, so your programs and words will disappear when the tab closes. Export to Excel from each
-            program's Words page to keep a copy.
+            Browser storage is unavailable, so your programs and words will disappear when the tab closes. Export a backup on the Backup
+            page to keep a copy.
           </p>
         ) : null}
         {/* Pages load on demand; the header stays while one does. */}

@@ -8,7 +8,7 @@ import { ProgramForm } from '../features/programs/ProgramForm.jsx';
 import { ProgramLevels } from '../features/programs/ProgramLevels.jsx';
 import { ProgramProgress } from '../features/programs/ProgramProgress.jsx';
 import { getLanguage } from '../languages/index.js';
-import { PASSED_LEVEL, quizProgressOf, summarizeWords } from '../features/vocabulary/model.js';
+import { quizProgressOf, summarizeWords, targetsOf } from '../features/vocabulary/model.js';
 
 export default function HomePage() {
   const { programs, wordsByProgram, removeProgram } = usePrograms();
@@ -31,8 +31,9 @@ export default function HomePage() {
           <ul className="list-unstyled vstack gap-3 mb-0">
             {programs.map((program) => {
               const words = wordsByProgram[program.id] ?? [];
-              const summary = summarizeWords(words);
-              const quiz = quizProgressOf(words);
+              const targets = targetsOf(program);
+              const summary = summarizeWords(words, targets);
+              const quiz = quizProgressOf(words, targets);
               return (
                 <li key={program.id} className="card card-body vstack gap-3">
                   <div className="d-flex flex-wrap align-items-baseline justify-content-between gap-2">
@@ -52,7 +53,7 @@ export default function HomePage() {
                   </div>
                   {summary.total > 0 ? (
                     <>
-                      <ProgramProgress words={words} summary={summary} />
+                      <ProgramProgress summary={summary} />
                       <div className="d-flex flex-wrap align-items-center gap-2 gap-md-3 small">
                         <span className="fw-semibold">Quiz progress</span>
                         <ProgressBar
@@ -64,11 +65,14 @@ export default function HomePage() {
                           {quiz.passed} of {quiz.total} words passed · {quiz.percent}%
                         </span>
                       </div>
-                      <p className="small text-body-secondary mb-0">A word is passed after {PASSED_LEVEL} correct answers in the quiz.</p>
                     </>
                   ) : (
                     <p className="small text-body-secondary mb-0">No words yet. Add them one by one or import a spreadsheet.</p>
                   )}
+                  <p className="small text-body-secondary mb-0">
+                    Mastered after {targets.mastered} correct answers in a row · passed after {targets.passed} correct
+                    quiz answers.
+                  </p>
                   <div className="d-flex flex-wrap align-items-center gap-2">
                     {summary.total > 0 ? (
                       <>

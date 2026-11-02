@@ -2,12 +2,13 @@ import { createId } from '../../lib/id.js';
 import { cleanText, titleText } from '../../lib/text.js';
 import { getLanguage } from '../../languages/index.js';
 import { normalizeRomaji } from '../../languages/japanese/romaji.js';
-import { DEFAULT_LANGUAGES, LIMITS, MASTERED_LEVEL, normalizeLanguageCode } from './model.js';
+import { DEFAULT_LANGUAGES, DEFAULT_TARGETS, LIMITS, TARGET_LIMITS, normalizeLanguageCode, sanitizeTarget } from './model.js';
 import { sanitizeLevels } from './programs.js';
 
 /** Legacy key from before programs existed; still the default for loadWords/saveWords. */
 export const STORAGE_KEY = 'vocab-app:v1';
 export const PROGRAMS_KEY = 'vocab-app:programs';
+export const SETTINGS_KEY = 'vocab-app:settings';
 const SCHEMA_VERSION = 1;
 const PROGRAM_NAME_LIMIT = 60;
 
@@ -44,7 +45,7 @@ function normalizePersistedWord(item) {
     wordLanguage,
     meaningLanguage,
     romaji: wordLanguage === 'ja' ? normalizeRomaji(item.romaji).slice(0, LIMITS.term * 4) : '',
-    mastery: Math.min(MASTERED_LEVEL, toCount(item.mastery)),
+    mastery: Math.min(TARGET_LIMITS.max, toCount(item.mastery)),
     quizPassed: toCount(item.quizPassed),
     attempts: toCount(item.attempts),
     correctCount: toCount(item.correctCount),
@@ -93,7 +94,7 @@ function serializeForStorage(word) {
     term,
     wordLanguage: normalizedWordLanguage,
     meaningLanguage: normalizedMeaningLanguage,
-    mastery: Math.min(MASTERED_LEVEL, toCount(word.mastery)),
+    mastery: Math.min(TARGET_LIMITS.max, toCount(word.mastery)),
     quizPassed: toCount(word.quizPassed),
     attempts: toCount(word.attempts),
     correctCount: toCount(word.correctCount),
@@ -108,14 +109,16 @@ function serializeForStorage(word) {
   return persisted;
 }
 
+/** Words as they are saved (and exported in a backup): only the fields worth keeping. */
+export function toStoredWords(words) {
+  return words.map((word) => serializeForStorage(word)).filter(Boolean);
+}
+
 /** Returns true when the data was written. */
 export function saveWords(words, storage = getDefaultStorage(), key = STORAGE_KEY) {
   try {
     if (!storage) return false;
-    const persisted = words
-      .map((word) => serializeForStorage(word))
-      .filter(Boolean);
-    storage.setItem(key, JSON.stringify({ version: SCHEMA_VERSION, words: persisted }));
+    storage.setItem(key, JSON.stringify({ version: SCHEMA_VERSION, words: toStoredWords(words) }));
     return true;
   } catch {
     return false;
@@ -136,7 +139,16 @@ export function sanitizePrograms(raw) {
     usedIds.add(id);
     const wordLanguage = item.wordLanguage ? normalizeLanguageCode(item.wordLanguage, DEFAULT_LANGUAGES.wordLanguage) : null;
     const levels = Array.isArray(item.levels) ? item.levels : [];
-    programs.push({ id, name, wordLanguage, levels, createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now() });
+    programs.push({
+      id,
+      name,
+      wordLanguage,
+      levels,
+      // Programs saved before targets existed keep the defaults.
+      masteredLevel: sanitizeTarget(item.masteredLevel, DEFAULT_TARGETS.mastered),
+      passedLevel: sanitizeTarget(item.passedLevel, DEFAULT_TARGETS.passed),
+      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+    });
   }
   return programs;
 }
@@ -167,7 +179,15 @@ function migrateLegacyWords(words) {
   const wordsByProgram = {};
   for (const [wordLanguage, list] of byLanguage) {
     const name = byLanguage.size > 1 ? `My words (${getLanguage(wordLanguage).label})` : 'My words';
-    const program = { id: createId(), name, wordLanguage, levels: [], createdAt: Date.now() };
+    const program = {
+      id: createId(),
+      name,
+      wordLanguage,
+      levels: [],
+      masteredLevel: DEFAULT_TARGETS.mastered,
+      passedLevel: DEFAULT_TARGETS.passed,
+      createdAt: Date.now(),
+    };
     programs.push(program);
     wordsByProgram[program.id] = list;
   }
@@ -193,25 +213,36 @@ export function loadPrograms(storage = getDefaultStorage()) {
     return migrateLegacyWords(legacyWords);
   }
 
+  return settlePrograms(programs, (program) => loadWords(storage, programWordsKey(program.id)));
+}
+
+/**
+ * { programs, wordsByProgram } from sanitized programs and `wordsOf(program)`.
+ * A program without a word language gets the one most of its words use,
+ * and its words and levels are kept in that language.
+ */
+export function settlePrograms(programs, wordsOf) {
   const wordsByProgram = {};
-  programs = programs.map((program) => {
-    const words = loadWords(storage, programWordsKey(program.id));
+  const settled = programs.map((program) => {
+    const words = wordsOf(program);
     const wordLanguage = program.wordLanguage ?? mostUsedLanguage(words);
     wordsByProgram[program.id] = words.map((word) => (word.wordLanguage === wordLanguage ? word : { ...word, wordLanguage }));
     return { ...program, wordLanguage, levels: sanitizeLevels(program.levels, wordLanguage) };
   });
-  return { programs, wordsByProgram };
+  return { programs: settled, wordsByProgram };
 }
 
 /** Returns true when the program list was written. */
 export function savePrograms(programs, storage = getDefaultStorage()) {
   try {
     if (!storage) return false;
-    const persisted = programs.map(({ id, name, wordLanguage, levels, createdAt }) => ({
+    const persisted = programs.map(({ id, name, wordLanguage, levels, masteredLevel, passedLevel, createdAt }) => ({
       id,
       name,
       wordLanguage,
       levels,
+      masteredLevel,
+      passedLevel,
       createdAt,
     }));
     storage.setItem(PROGRAMS_KEY, JSON.stringify({ version: SCHEMA_VERSION, programs: persisted }));
@@ -227,5 +258,35 @@ export function removeStoredWords(key, storage = getDefaultStorage()) {
     storage?.removeItem(key);
   } catch {
     // nothing to clean up when storage is blocked
+  }
+}
+
+/**
+ * App settings: the learning targets new programs start with,
+ * { masteredLevel, passedLevel }, each 1-100 (default 100).
+ */
+export function cleanSettings(raw) {
+  return {
+    masteredLevel: sanitizeTarget(raw?.masteredLevel, DEFAULT_TARGETS.mastered),
+    passedLevel: sanitizeTarget(raw?.passedLevel, DEFAULT_TARGETS.passed),
+  };
+}
+
+export function loadSettings(storage = getDefaultStorage()) {
+  try {
+    return cleanSettings(JSON.parse(storage?.getItem(SETTINGS_KEY) ?? 'null'));
+  } catch {
+    return cleanSettings(null);
+  }
+}
+
+/** Returns true when the settings were written. */
+export function saveSettings(settings, storage = getDefaultStorage()) {
+  try {
+    if (!storage) return false;
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ version: SCHEMA_VERSION, ...cleanSettings(settings) }));
+    return true;
+  } catch {
+    return false;
   }
 }

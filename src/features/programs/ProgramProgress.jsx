@@ -1,5 +1,4 @@
 import { STATUS_COLORS } from '../../components/MasteryDots.jsx';
-import { summarizeWords } from '../vocabulary/model.js';
 
 const SEGMENTS = [
   { key: 'mastered', label: 'Mastered' },
@@ -8,8 +7,8 @@ const SEGMENTS = [
   { key: 'new', label: 'New' },
 ];
 
-/** Bootstrap stacked progress bar with a legend for one word list. */
-export function ProgramProgress({ words, summary = summarizeWords(words) }) {
+/** Bootstrap stacked progress bar with a legend for one word list (`summary` from summarizeWords). */
+export function ProgramProgress({ summary }) {
   return (
     <div className="vstack gap-2">
       <div

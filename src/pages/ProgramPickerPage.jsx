@@ -4,7 +4,7 @@ import { EmptyState } from '../components/EmptyState.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
 import { ProgramLevels } from '../features/programs/ProgramLevels.jsx';
 import { getLanguage } from '../languages/index.js';
-import { summarizeWords } from '../features/vocabulary/model.js';
+import { summarizeWords, targetsOf } from '../features/vocabulary/model.js';
 import { usePrograms } from '../hooks/usePrograms.js';
 
 /** Shown every time a menu is opened: the user picks which program to work on. */
@@ -24,7 +24,7 @@ export default function ProgramPickerPage({ section }) {
       ) : (
         <ul className="list-group" aria-label="Programs">
           {programs.map((program) => {
-            const summary = summarizeWords(wordsByProgram[program.id] ?? []);
+            const summary = summarizeWords(wordsByProgram[program.id] ?? [], targetsOf(program));
             return (
               <li key={program.id} className="list-group-item p-0">
                 <Link

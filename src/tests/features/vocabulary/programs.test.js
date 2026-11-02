@@ -8,15 +8,19 @@ import {
   sanitizeLevels,
   validateProgramLevels,
   validateProgramName,
+  validateProgramTarget,
 } from '../../../features/vocabulary/programs.js';
 import {
   PROGRAMS_KEY,
+  SETTINGS_KEY,
   STORAGE_KEY,
   loadPrograms,
+  loadSettings,
   programWordsKey,
   removeStoredWords,
   sanitizePrograms,
   savePrograms,
+  saveSettings,
   saveWords,
 } from '../../../features/vocabulary/storage.js';
 
@@ -67,6 +71,16 @@ describe('validateProgramName', () => {
   });
 });
 
+describe('validateProgramTarget', () => {
+  test.each(['1', '50', '100', 25])('accepts %p', (value) => {
+    expect(validateProgramTarget(value)).toBe('');
+  });
+
+  test.each(['', '  ', '0', '101', '2.5', 'abc'])('refuses %p', (value) => {
+    expect(validateProgramTarget(value)).toMatch(/whole number from 1 to 100/);
+  });
+});
+
 describe('createProgram', () => {
   test('trims the name and defaults to English', () => {
     const name = '  TOEFL  ';
@@ -83,6 +97,18 @@ describe('createProgram', () => {
     const program = createProgram('N5', language);
 
     expect(program.wordLanguage).toBe('ja');
+  });
+
+  test('starts with the default learning targets', () => {
+    const program = createProgram('TOEFL');
+
+    expect(program).toMatchObject({ masteredLevel: 100, passedLevel: 100 });
+  });
+
+  test('copies the learning targets it is given', () => {
+    const program = createProgram('TOEFL', 'en', [], { masteredLevel: 20, passedLevel: 500 });
+
+    expect(program).toMatchObject({ masteredLevel: 20, passedLevel: 100 });
   });
 
   test('keeps its levels in the standard order', () => {
@@ -163,6 +189,18 @@ describe('programsReducer', () => {
     const after = programsReducer(state, wordAction(program.id, { type: 'result/recorded', id: word.id, correct: true }));
 
     expect(after.wordsByProgram[program.id][0].mastery).toBe(1);
+  });
+
+  test('answers follow the program learning targets', () => {
+    const program = createProgram('A', 'en', [], { masteredLevel: 2, passedLevel: 2 });
+    const word = createWord({ term: 'hello', meaning: 'halo' });
+    let state = programsReducer(stateWith(program), wordAction(program.id, { type: 'words/added', words: [word] }));
+
+    for (let i = 0; i < 3; i++) {
+      state = programsReducer(state, wordAction(program.id, { type: 'result/recorded', id: word.id, correct: true, source: 'quiz' }));
+    }
+
+    expect(state.wordsByProgram[program.id][0]).toMatchObject({ mastery: 2, quizPassed: 3 });
   });
 
   test.each([
@@ -250,6 +288,19 @@ describe('saving and loading programs', () => {
     expect(programs[0].levels).toEqual(['N5', 'N4']);
   });
 
+  test('restores the learning targets, defaulting older programs to 100', () => {
+    const storage = fakeStorage({
+      [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'a', name: 'Old', wordLanguage: 'en' }] }),
+    });
+    const program = createProgram('New', 'en', [], { masteredLevel: 7, passedLevel: 9 });
+
+    const before = loadPrograms(storage).programs[0];
+    savePrograms([before, program], storage);
+    const { programs } = loadPrograms(storage);
+
+    expect(programs.map((p) => [p.masteredLevel, p.passedLevel])).toEqual([[100, 100], [7, 9]]);
+  });
+
   test('drops invalid stored levels', () => {
     const storage = fakeStorage({
       [PROGRAMS_KEY]: JSON.stringify({
@@ -278,6 +329,30 @@ describe('saving and loading programs', () => {
       ['Book', 'id', 'Buku'],
       ['Book', 'ja', '本'],
     ]);
+  });
+});
+
+describe('app settings', () => {
+  test('default to 100 for both targets', () => {
+    const settings = loadSettings(fakeStorage());
+
+    expect(settings).toEqual({ masteredLevel: 100, passedLevel: 100 });
+  });
+
+  test('are saved and loaded back, kept within 1-100', () => {
+    const storage = fakeStorage();
+
+    const saved = saveSettings({ masteredLevel: 30, passedLevel: 0 }, storage);
+
+    expect(saved).toBe(true);
+    expect(loadSettings(storage)).toEqual({ masteredLevel: 30, passedLevel: 1 });
+  });
+
+  test('ignore damaged storage', () => {
+    const storage = fakeStorage({ [SETTINGS_KEY]: '{oops' });
+
+    expect(loadSettings(storage)).toEqual({ masteredLevel: 100, passedLevel: 100 });
+    expect(saveSettings({}, null)).toBe(false);
   });
 });
 

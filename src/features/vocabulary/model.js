@@ -11,10 +11,29 @@ import { createId } from '../../lib/id.js';
 import { cleanText, lowerText, normalizeText, titleText } from '../../lib/text.js';
 
 export const LIMITS = { term: 120, meaning: 400 };
-/** Correct answers in a row needed for 'Mastered'; a wrong answer starts again from 0. */
-export const MASTERED_LEVEL = 100;
-/** Correct quiz answers (in total, wrong answers do not reset it) for the 'Passed' flag. */
-export const PASSED_LEVEL = 100;
+/**
+ * Learning targets of a program:
+ * - mastered: correct answers in a row for 'Mastered' (a wrong answer starts again from 0);
+ * - passed: correct quiz answers in total for 'Passed' (wrong answers do not reset it).
+ * They are set in the app settings and copied into each program when it is created.
+ */
+export const DEFAULT_TARGETS = Object.freeze({ mastered: 100, passed: 100 });
+export const TARGET_LIMITS = Object.freeze({ min: 1, max: 100 });
+
+/** A whole number within TARGET_LIMITS, or `fallback` when the value is not usable. */
+export function sanitizeTarget(value, fallback = DEFAULT_TARGETS.mastered) {
+  const n = Number(value);
+  if (!Number.isInteger(n)) return fallback;
+  return Math.min(TARGET_LIMITS.max, Math.max(TARGET_LIMITS.min, n));
+}
+
+/** The targets a program was created with; programs from before targets existed use the defaults. */
+export function targetsOf(program) {
+  return {
+    mastered: sanitizeTarget(program?.masteredLevel, DEFAULT_TARGETS.mastered),
+    passed: sanitizeTarget(program?.passedLevel, DEFAULT_TARGETS.passed),
+  };
+}
 export const DEFAULT_LANGUAGES = { wordLanguage: DEFAULT_WORD_LANGUAGE, meaningLanguage: DEFAULT_MEANING_LANGUAGE };
 
 export { LANGUAGE_OPTIONS, normalizeLanguageCode };
@@ -79,9 +98,9 @@ export function getWordSuggestions(words = [], query = '', language = DEFAULT_LA
 
 /**
  * Word shape:
- * { id, term, meaning, wordLanguage, meaningLanguage, romaji, mastery (0-100), quizPassed, attempts, correctCount, createdAt }
+ * { id, term, meaning, wordLanguage, meaningLanguage, romaji, mastery (0 to the mastered target), quizPassed, attempts, correctCount, createdAt }
  * mastery goes up by one for each correct answer and drops to 0 on a wrong one.
- * quizPassed counts correct quiz answers only; at PASSED_LEVEL the word is 'Passed'.
+ * quizPassed counts correct quiz answers only; at the program's `passed` target the word is 'Passed'.
  */
 export function createWord(input, now = Date.now()) {
   const rawTerm = lowerText(input.term);
@@ -157,13 +176,13 @@ export function groupByTerm(words) {
   return [...groups.values()];
 }
 
-/** `source` 'quiz' also counts a correct answer towards the Passed flag. */
-export function applyResult(word, correct, source = 'flashcards') {
+/** `source` 'quiz' also counts a correct answer towards the Passed flag. Mastery stops at `targets.mastered`. */
+export function applyResult(word, correct, source = 'flashcards', targets = DEFAULT_TARGETS) {
   return {
     ...word,
     attempts: word.attempts + 1,
     correctCount: word.correctCount + (correct ? 1 : 0),
-    mastery: correct ? Math.min(MASTERED_LEVEL, word.mastery + 1) : 0,
+    mastery: correct ? Math.min(targets.mastered, word.mastery + 1) : 0,
     quizPassed: (word.quizPassed ?? 0) + (correct && source === 'quiz' ? 1 : 0),
   };
 }
@@ -172,15 +191,15 @@ export function resetProgress(word) {
   return { ...word, mastery: 0, quizPassed: 0, attempts: 0, correctCount: 0 };
 }
 
-/** Answered correctly in the quiz PASSED_LEVEL (100) times. */
-export function isPassed(word) {
-  return (word.quizPassed ?? 0) >= PASSED_LEVEL;
+/** Answered correctly in the quiz `targets.passed` times. */
+export function isPassed(word, targets = DEFAULT_TARGETS) {
+  return (word.quizPassed ?? 0) >= targets.passed;
 }
 
 /** 'new' (never practised), 'weak' (last answer wrong), 'learning', 'mastered'. */
-export function getStatus(word) {
+export function getStatus(word, targets = DEFAULT_TARGETS) {
   if (word.attempts === 0) return 'new';
-  if (word.mastery >= MASTERED_LEVEL) return 'mastered';
+  if (word.mastery >= targets.mastered) return 'mastered';
   if (word.mastery === 0) return 'weak';
   return 'learning';
 }
@@ -192,11 +211,11 @@ export const STATUS_LABELS = {
   mastered: 'Mastered',
 };
 
-export function summarizeWords(words) {
+export function summarizeWords(words, targets = DEFAULT_TARGETS) {
   const summary = { total: words.length, new: 0, weak: 0, learning: 0, mastered: 0, passed: 0 };
   for (const word of words) {
-    summary[getStatus(word)]++;
-    if (isPassed(word)) summary.passed++;
+    summary[getStatus(word, targets)]++;
+    if (isPassed(word, targets)) summary.passed++;
   }
   return summary;
 }
@@ -221,18 +240,18 @@ export function meaningLanguagesOf(words) {
 }
 
 /**
- * Quiz progress of a list towards Passed: each word counts up to PASSED_LEVEL
+ * Quiz progress of a list towards Passed: each word counts up to `targets.passed`
  * correct quiz answers. { passed, total, points, max, percent }.
  */
-export function quizProgressOf(words) {
+export function quizProgressOf(words, targets = DEFAULT_TARGETS) {
   let points = 0;
   let passed = 0;
   for (const word of words) {
-    const count = Math.min(word.quizPassed ?? 0, PASSED_LEVEL);
+    const count = Math.min(word.quizPassed ?? 0, targets.passed);
     points += count;
-    if (count >= PASSED_LEVEL) passed += 1;
+    if (count >= targets.passed) passed += 1;
   }
-  const max = words.length * PASSED_LEVEL;
+  const max = words.length * targets.passed;
   return { passed, total: words.length, points, max, percent: max ? Math.floor((points / max) * 100) : 0 };
 }
 

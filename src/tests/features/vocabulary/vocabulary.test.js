@@ -1,8 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  DEFAULT_TARGETS,
   LANGUAGE_OPTIONS,
-  MASTERED_LEVEL,
-  PASSED_LEVEL,
   applyResult,
   createWord,
   defaultMeaningLanguage,
@@ -15,7 +14,9 @@ import {
   meaningLanguageOptions,
   quizProgressOf,
   resetProgress,
+  sanitizeTarget,
   summarizeWords,
+  targetsOf,
   termKey,
   toJapaneseReading,
   validateWordInput,
@@ -239,12 +240,11 @@ describe('getWordSuggestions', () => {
 });
 
 describe('mastery', () => {
-  test('the mastered level is 100', () => {
-    const level = MASTERED_LEVEL;
+  test('the default mastered target is 100', () => {
+    const targets = targetsOf(undefined);
 
-    const value = level;
-
-    expect(value).toBe(100);
+    expect(targets.mastered).toBe(100);
+    expect(DEFAULT_TARGETS.mastered).toBe(100);
   });
 
   test('99 correct answers in a row are one short of mastered', () => {
@@ -280,7 +280,7 @@ describe('mastery', () => {
     const words = [
       word('a', 'b'),
       word('c', 'd', { attempts: 2, mastery: 1 }),
-      word('e', 'f', { attempts: 100, mastery: MASTERED_LEVEL }),
+      word('e', 'f', { attempts: 100, mastery: DEFAULT_TARGETS.mastered }),
       word('g', 'h', { attempts: 1, mastery: 0 }),
     ];
 
@@ -290,13 +290,54 @@ describe('mastery', () => {
   });
 });
 
+describe('learning targets', () => {
+  test.each([
+    [5, 5],
+    ['20', 20],
+    [0, 1],
+    [5000, 100],
+    [2.5, 100],
+    ['abc', 100],
+    [undefined, 100],
+  ])('sanitizeTarget(%p) is %p', (value, expected) => {
+    expect(sanitizeTarget(value)).toBe(expected);
+  });
+
+  test('targetsOf reads the program targets', () => {
+    const targets = targetsOf({ masteredLevel: 10, passedLevel: 3 });
+
+    expect(targets).toEqual({ mastered: 10, passed: 3 });
+  });
+
+  test('mastery stops at a custom mastered target', () => {
+    const targets = { mastered: 5, passed: 3 };
+
+    const custom = [...Array(8)].reduce((current) => applyResult(current, true, 'flashcards', targets), word('a', 'b'));
+
+    expect(custom.mastery).toBe(5);
+    expect(getStatus(custom, targets)).toBe('mastered');
+    expect(getStatus(custom)).toBe('learning');
+  });
+
+  test('a custom passed target passes the word sooner', () => {
+    const targets = { mastered: 5, passed: 3 };
+    const start = answered(word('a', 'b'), 3, true, 'quiz');
+
+    const summary = summarizeWords([start], targets);
+
+    expect(isPassed(start, targets)).toBe(true);
+    expect(isPassed(start)).toBe(false);
+    expect(summary.passed).toBe(1);
+    expect(quizProgressOf([start, word('c', 'd')], targets)).toMatchObject({ points: 3, max: 6, passed: 1, percent: 50 });
+  });
+});
+
 describe('Passed flag', () => {
-  test('the passed level is 100', () => {
-    const level = PASSED_LEVEL;
+  test('the default passed target is 100', () => {
+    const targets = targetsOf({});
 
-    const value = level;
-
-    expect(value).toBe(100);
+    expect(targets.passed).toBe(100);
+    expect(DEFAULT_TARGETS.passed).toBe(100);
   });
 
   test('wrong quiz answers and flashcard answers do not count towards it', () => {
@@ -561,7 +602,7 @@ describe('sanitizeWords', () => {
     const words = sanitizeWords(raw);
 
     expect(words).toHaveLength(2);
-    expect(words[0].mastery).toBe(MASTERED_LEVEL);
+    expect(words[0].mastery).toBe(100); // capped at the largest target
     expect(words[0].attempts).toBe(0);
     expect(words[0].id).not.toBe(words[1].id);
   });

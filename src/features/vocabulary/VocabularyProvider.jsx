@@ -4,10 +4,13 @@ import { createWord } from './model.js';
 import { createProgram, programsReducer } from './programs.js';
 import {
   STORAGE_KEY,
+  cleanSettings,
   loadPrograms,
+  loadSettings,
   programWordsKey,
   removeStoredWords,
   savePrograms,
+  saveSettings,
   saveWords,
 } from './storage.js';
 
@@ -21,6 +24,8 @@ const NO_WORDS = [];
 export function ProgramsProvider({ children, storage }) {
   const [state, dispatch] = useReducer(programsReducer, undefined, () => loadPrograms(storage));
   const [persistFailed, setPersistFailed] = useState(false);
+  // App settings: the learning targets the next new program starts with (the last ones used).
+  const [settings, setSettings] = useState(() => loadSettings(storage));
   // What was last written, so a change only rewrites what actually changed.
   const savedProgramsRef = useRef(null);
   const savedWordsRef = useRef({}); // programId -> the words array last written
@@ -88,21 +93,31 @@ export function ProgramsProvider({ children, storage }) {
 
   const programActions = useMemo(
     () => ({
-      addProgram(name, wordLanguage, levels) {
-        const program = createProgram(name, wordLanguage, levels);
+      /** `targets` ({ masteredLevel, passedLevel }) are kept by the program and remembered for the next one. */
+      addProgram(name, wordLanguage, levels, targets) {
+        const program = createProgram(name, wordLanguage, levels, targets);
         dispatch({ type: 'program/added', program });
+        const next = { masteredLevel: program.masteredLevel, passedLevel: program.passedLevel };
+        setSettings(cleanSettings(next)); // used for this session even when it cannot be saved
+        saveSettings(next, storage);
         return program;
       },
       removeProgram(id) {
         dispatch({ type: 'program/removed', id });
       },
+      /** Replaces every program, word and setting, e.g. with a restored backup (see parseBackup). */
+      replaceAll({ programs, wordsByProgram, settings: nextSettings }) {
+        dispatch({ type: 'programs/replaced', programs, wordsByProgram });
+        setSettings(cleanSettings(nextSettings));
+        saveSettings(nextSettings, storage);
+      },
     }),
-    [],
+    [storage],
   );
 
   const value = useMemo(
-    () => ({ ...state, persistFailed, wordActions, ...programActions }),
-    [state, persistFailed, wordActions, programActions],
+    () => ({ ...state, settings, persistFailed, wordActions, ...programActions }),
+    [state, settings, persistFailed, wordActions, programActions],
   );
 
   return <ProgramsContext.Provider value={value}>{children}</ProgramsContext.Provider>;

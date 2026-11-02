@@ -86,7 +86,7 @@ export function Flashcard({ word, flipped, onFlip, onMeaning, onRomaji }) {
             <span className="fc-word fc-word--answer" lang={back.lang}>{back.text}</span>
             <CardExamples examples={examples} field="translation" lang={word.meaningLanguage} />
           </span>
-          <span className="fc-foot">Remember? Choose Mastered. Not yet? Choose Not mastered.</span>
+          <span className="fc-foot">Remember? Choose Mastery. Not yet? Choose Not mastered.</span>
         </span>
       </button>
     </div>

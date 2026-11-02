@@ -42,7 +42,7 @@ export function vocabularyReducer(state, action) {
       return {
         ...state,
         words: state.words.map((word) =>
-          word.id === action.id ? applyResult(word, action.correct, action.source) : word,
+          word.id === action.id ? applyResult(word, action.correct, action.source, action.targets) : word,
         ),
       };
     case 'progress/reset':
