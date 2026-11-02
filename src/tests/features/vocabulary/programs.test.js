@@ -14,6 +14,7 @@ import {
   PROGRAMS_KEY,
   SETTINGS_KEY,
   STORAGE_KEY,
+  decodeStored,
   loadPrograms,
   loadSettings,
   programWordsKey,
@@ -324,7 +325,7 @@ describe('saving and loading programs', () => {
 
     saveWords(state.wordsByProgram[program.id], storage, programWordsKey(program.id));
 
-    const saved = JSON.parse(storage.data[programWordsKey(program.id)]).words;
+    const saved = JSON.parse(decodeStored(storage.data[programWordsKey(program.id)])).words;
     expect(saved.map((word) => [word.term, word.meaningLanguage, word.meaning])).toEqual([
       ['Book', 'id', 'Buku'],
       ['Book', 'ja', '本'],

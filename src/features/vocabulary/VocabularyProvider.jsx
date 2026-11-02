@@ -5,6 +5,7 @@ import { createProgram, programsReducer } from './programs.js';
 import {
   STORAGE_KEY,
   cleanSettings,
+  isCompressedList,
   loadPrograms,
   loadSettings,
   programWordsKey,
@@ -15,6 +16,16 @@ import {
 } from './storage.js';
 
 const NO_WORDS = [];
+const SAVE_DELAY_MS = 400;
+
+/** The loaded word lists that are already saved compressed, so they are not rewritten at start. */
+function compressedOnStart({ programs, wordsByProgram }, storage) {
+  const saved = {};
+  for (const program of programs) {
+    if (isCompressedList(programWordsKey(program.id), storage)) saved[program.id] = wordsByProgram[program.id];
+  }
+  return saved;
+}
 
 /**
  * Holds every program and its word list for the whole app and saves them to
@@ -28,25 +39,32 @@ export function ProgramsProvider({ children, storage }) {
   const [settings, setSettings] = useState(() => loadSettings(storage));
   // What was last written, so a change only rewrites what actually changed.
   const savedProgramsRef = useRef(null);
-  const savedWordsRef = useRef({}); // programId -> the words array last written
+  // programId -> the words array last written. Lists already stored compressed need no rewrite at start.
+  const savedWordsRef = useRef(null);
+  if (savedWordsRef.current === null) savedWordsRef.current = compressedOnStart(state, storage);
   const legacyRemovedRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  useEffect(() => {
+  // Compressing a long word list takes a moment, so saving waits until the changes pause
+  // (and happens at once when the page is hidden or closed).
+  const persist = useCallback(() => {
+    const current = stateRef.current;
     let ok = true;
-    if (savedProgramsRef.current !== state.programs) {
-      if (savePrograms(state.programs, storage)) savedProgramsRef.current = state.programs;
+    if (savedProgramsRef.current !== current.programs) {
+      if (savePrograms(current.programs, storage)) savedProgramsRef.current = current.programs;
       else ok = false;
     }
     const saved = savedWordsRef.current;
 
-    for (const program of state.programs) {
-      const words = state.wordsByProgram[program.id] ?? NO_WORDS;
+    for (const program of current.programs) {
+      const words = current.wordsByProgram[program.id] ?? NO_WORDS;
       if (saved[program.id] === words) continue;
       if (saveWords(words, storage, programWordsKey(program.id))) saved[program.id] = words;
       else ok = false;
     }
     for (const id of Object.keys(saved)) {
-      if (state.wordsByProgram[id]) continue;
+      if (current.wordsByProgram[id]) continue;
       removeStoredWords(programWordsKey(id), storage);
       delete saved[id];
     }
@@ -57,7 +75,25 @@ export function ProgramsProvider({ children, storage }) {
     }
 
     setPersistFailed(!ok);
-  }, [state, storage]);
+  }, [storage]);
+
+  useEffect(() => {
+    const timer = setTimeout(persist, SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [state, persist]);
+
+  useEffect(() => {
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') persist();
+    };
+    window.addEventListener('pagehide', persist);
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    return () => {
+      persist(); // e.g. the provider unmounts with a save still waiting
+      window.removeEventListener('pagehide', persist);
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+    };
+  }, [persist]);
 
   const wordActions = useCallback((programId) => {
     const run = (action) => dispatch({ type: 'program/words', programId, action });

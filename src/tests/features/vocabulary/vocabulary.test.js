@@ -22,7 +22,7 @@ import {
   validateWordInput,
 } from '../../../features/vocabulary/model.js';
 import { initialVocabularyState, vocabularyReducer } from '../../../features/vocabulary/reducer.js';
-import { loadWords, sanitizeWords, saveWords, STORAGE_KEY } from '../../../features/vocabulary/storage.js';
+import { decodeStored, loadWords, sanitizeWords, saveWords, STORAGE_KEY } from '../../../features/vocabulary/storage.js';
 
 const word = (term, meaning, extra = {}) => ({ ...createWord({ term, meaning }), ...extra });
 
@@ -519,10 +519,40 @@ describe('saving and loading words', () => {
     const saved = saveWords(words, storage);
 
     expect(saved).toBe(true);
-    expect(JSON.parse(storage.getItem(STORAGE_KEY)).words).toEqual([
+    expect(JSON.parse(decodeStored(storage.getItem(STORAGE_KEY))).words).toEqual([
       { id: 'w1', term: 'thrive', wordLanguage: 'en', meaningLanguage: 'id', mastery: 2, quizPassed: 0, attempts: 5, correctCount: 4, createdAt: 123, meaning: 'tumbuh subur' },
       { id: 'w2', term: 'swift', wordLanguage: 'en', meaningLanguage: 'id', mastery: 0, quizPassed: 0, attempts: 1, correctCount: 0, createdAt: 456, meaning: 'cepat' },
     ]);
+  });
+
+  test('saveWords compresses the list', () => {
+    const storage = fakeStorage();
+    const many = Array.from({ length: 200 }, (_, i) => ({ ...words[i % 2], id: `w${i}`, term: `word ${i}` }));
+
+    saveWords(many, storage);
+
+    const stored = storage.getItem(STORAGE_KEY);
+    expect(stored.startsWith('lz:')).toBe(true);
+    expect(stored.length).toBeLessThan(decodeStored(stored).length / 3);
+    expect(loadWords(storage)).toHaveLength(200);
+  });
+
+  test('loadWords still reads a list saved as plain JSON', () => {
+    const storage = fakeStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, words }));
+
+    const loaded = loadWords(storage);
+
+    expect(loaded.map((word) => word.term)).toEqual(['Thrive', 'Swift']);
+  });
+
+  test('loadWords returns an empty list for damaged compressed data', () => {
+    const storage = fakeStorage();
+    storage.setItem(STORAGE_KEY, 'lz:\u0001garbage');
+
+    const loaded = loadWords(storage);
+
+    expect(loaded).toEqual([]);
   });
 
   test('loadWords restores the clean shape, in Title Case', () => {

@@ -11,7 +11,7 @@ import {
 } from '../../../languages/japanese/romaji.js';
 import { createWord } from '../../../features/vocabulary/model.js';
 import { parseJlptEntries } from '../../../features/vocabulary/sampleSource.js';
-import { loadWords, saveWords, STORAGE_KEY } from '../../../features/vocabulary/storage.js';
+import { decodeStored, loadWords, saveWords, STORAGE_KEY } from '../../../features/vocabulary/storage.js';
 
 describe('kana and romaji', () => {
   test.each([
@@ -156,7 +156,7 @@ describe('romaji on words', () => {
     saveWords(words, storage);
     const reloaded = loadWords(storage);
 
-    const raw = JSON.parse(data[STORAGE_KEY]).words;
+    const raw = JSON.parse(decodeStored(data[STORAGE_KEY])).words;
     expect(raw[0].romaji).toBe('maiasa');
     expect('romaji' in raw[1]).toBe(false);
     expect(reloaded.map((word) => word.romaji)).toEqual(['maiasa', '']);

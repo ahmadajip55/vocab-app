@@ -1,3 +1,4 @@
+import LZString from 'lz-string';
 import { createId } from '../../lib/id.js';
 import { cleanText, titleText } from '../../lib/text.js';
 import { getLanguage } from '../../languages/index.js';
@@ -10,6 +11,8 @@ export const STORAGE_KEY = 'vocab-app:v1';
 export const PROGRAMS_KEY = 'vocab-app:programs';
 export const SETTINGS_KEY = 'vocab-app:settings';
 const SCHEMA_VERSION = 1;
+// Word lists are saved compressed (lz-string, safe for UTF-16 storage), several times smaller than JSON.
+const COMPRESSED_PREFIX = 'lz:';
 const PROGRAM_NAME_LIMIT = 60;
 
 /** Each program keeps its words under its own key. */
@@ -72,11 +75,25 @@ export function sanitizeWords(raw) {
   return words;
 }
 
+/** The JSON text of a saved word list; lists saved before compression are plain JSON already. */
+export function decodeStored(raw) {
+  return raw.startsWith(COMPRESSED_PREFIX) ? LZString.decompressFromUTF16(raw.slice(COMPRESSED_PREFIX.length)) : raw;
+}
+
+/** True when the list under `key` is saved in the compressed format. */
+export function isCompressedList(key, storage = getDefaultStorage()) {
+  try {
+    return storage?.getItem(key)?.startsWith(COMPRESSED_PREFIX) ?? false;
+  } catch {
+    return false;
+  }
+}
+
 export function loadWords(storage = getDefaultStorage(), key = STORAGE_KEY) {
   try {
     const raw = storage?.getItem(key);
     if (!raw) return [];
-    return sanitizeWords(JSON.parse(raw)?.words);
+    return sanitizeWords(JSON.parse(decodeStored(raw))?.words);
   } catch {
     return [];
   }
@@ -118,7 +135,8 @@ export function toStoredWords(words) {
 export function saveWords(words, storage = getDefaultStorage(), key = STORAGE_KEY) {
   try {
     if (!storage) return false;
-    storage.setItem(key, JSON.stringify({ version: SCHEMA_VERSION, words: toStoredWords(words) }));
+    const json = JSON.stringify({ version: SCHEMA_VERSION, words: toStoredWords(words) });
+    storage.setItem(key, COMPRESSED_PREFIX + LZString.compressToUTF16(json));
     return true;
   } catch {
     return false;
