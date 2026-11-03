@@ -39,21 +39,33 @@ export function normalizeRomaji(text) {
     .trim();
 }
 
-/** The romaji to show for a word: the saved one, or one worked out from kana. */
+/**
+ * A kana reading as typed: romaji turns into hiragana, kana stays as it is
+ * (katakana included). '' when it is not a reading in kana.
+ */
+export function toKanaReading(text) {
+  const value = String(text ?? '').trim().replace(/[A-Za-z][A-Za-z'-]*/g, (run) => toHiragana(run.toLowerCase()));
+  return isKanaOnly(value) ? value.replace(/\s+/g, '') : '';
+}
+
+/** The romaji to show for a word: the saved one, or one worked out from its kana reading or kana spelling. */
 export function romajiForWord(word) {
   if (word?.wordLanguage !== 'ja') return '';
-  return word.romaji || kanaToRomaji(word.term);
+  return word.romaji || kanaToRomaji(word.kana) || kanaToRomaji(word.term);
 }
 
 /**
  * How to read a Japanese word, for flashcards and the quiz: { kana, romaji }.
- * `kana` is the hiragana reading of a word with kanji (右 -> みぎ) and '' for a
+ * `kana` is the reading of a word with kanji (右 -> みぎ): the saved one, or hiragana
+ * worked out from its romaji. It is '' for a
  * word already written in kana; `romaji` is '' until it is known.
  * Returns null for other languages.
  */
 export function japaneseReading(word) {
   if (word?.wordLanguage !== 'ja') return null;
   const romaji = romajiForWord(word);
+  // A saved kana reading is shown as it is, katakana included.
+  if (word.kana && !isKanaOnly(word.term)) return { kana: word.kana, romaji };
   let kana = '';
   // A hyphen is not part of this romaji style (it comes from Google, e.g. "ichi-ri"),
   // and wanakana would read it as a long-vowel mark, so no kana is guessed from it.
@@ -100,4 +112,16 @@ export async function fetchRomaji(term, { fetchImpl = globalThis.fetch, signal }
   const segments = Array.isArray(payload?.[0]) ? payload[0] : [];
   const raw = segments.map((segment) => (Array.isArray(segment) && typeof segment[3] === 'string' ? segment[3] : '')).join(' ');
   return normalizeRomaji(raw);
+}
+
+/**
+ * What to read aloud for a word. A Japanese word is read from its kana reading
+ * when it is known (食べる -> たべる): speech voices often misread kanji, and a
+ * reading in kana is exact. Other words are read as written.
+ */
+export function readAloudText(word) {
+  if (word?.wordLanguage !== 'ja') return String(word?.term ?? '');
+  if (isKanaOnly(word.term)) return word.term;
+  const reading = japaneseReading(word);
+  return reading?.kana || word.term;
 }

@@ -9,6 +9,7 @@ import { useVocabulary } from '../hooks/useVocabulary.js';
 import { useProgramPath } from '../hooks/useProgramPath.js';
 import { buildWordsXlsx } from '../features/import/spreadsheetFiles.js';
 import { findByTerm, groupByTerm } from '../features/vocabulary/model.js';
+import { isKanjiProgram } from '../features/vocabulary/programs.js';
 import { WordForm } from '../features/vocabulary/WordForm.jsx';
 import { SampleWordsForm } from '../features/vocabulary/SampleWordsForm.jsx';
 import { WordList } from '../features/vocabulary/WordList.jsx';
@@ -29,7 +30,7 @@ export default function WordsPage() {
   const visibleWords = useMemo(() => {
     const needle = normalizeText(query);
     return words.filter(
-      (word) => !needle || normalizeText(`${word.term} ${romajiForWord(word)} ${word.meaning}`).includes(needle),
+      (word) => !needle || normalizeText(`${word.term} ${word.kana ?? ''} ${romajiForWord(word)} ${word.meaning}`).includes(needle),
     );
   }, [words, query]);
 
@@ -81,6 +82,7 @@ export default function WordsPage() {
             onCancel={() => setEditingId(null)}
             wordSuggestions={words}
             wordLanguage={program.wordLanguage}
+            kanjiMode={isKanjiProgram(program)}
             findDuplicate={(term, meaningLanguage) => findByTerm(words, term, editing.id, meaningLanguage)}
           />
         </section>
@@ -93,6 +95,7 @@ export default function WordsPage() {
             onSubmit={handleAdd}
             wordSuggestions={words}
             wordLanguage={program.wordLanguage}
+            kanjiMode={isKanjiProgram(program)}
             findDuplicate={(term, meaningLanguage) => findByTerm(words, term, undefined, meaningLanguage)}
           />
         </CollapsibleCard>
@@ -120,7 +123,7 @@ export default function WordsPage() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={program.wordLanguage === 'ja' ? 'word, romaji, or meaning' : 'word or meaning'}
+                placeholder={program.wordLanguage === 'ja' ? 'word, kana, romaji, or meaning' : 'word or meaning'}
               />
             </div>
           </div>
@@ -139,7 +142,7 @@ export default function WordsPage() {
           )}
 
           <div className="d-flex flex-wrap align-items-center gap-2 pt-2">
-            <Button onClick={() => downloadFile(`${exportFileName(program.name)}.xlsx`, buildWordsXlsx(words), XLSX_MIME)}>
+            <Button onClick={() => downloadFile(`${exportFileName(program.name)}.xlsx`, buildWordsXlsx(words, { kanji: isKanjiProgram(program) }), XLSX_MIME)}>
               Export to Excel
             </Button>
             <ConfirmButton

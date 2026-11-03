@@ -5,6 +5,7 @@ import { MasteryDots } from '../../components/MasteryDots.jsx';
 import { QuizPassedProgress } from '../../components/QuizPassedProgress.jsx';
 import { getLanguage } from '../../languages/index.js';
 import { fetchRomaji, needsRomajiLookup, romajiForWord } from '../../languages/japanese/romaji.js';
+import { ListenButton } from '../../components/ListenButton.jsx';
 import { clampPage, pageCount, pageItems } from '../../lib/pagination.js';
 
 const PAGE_SIZE = 10;
@@ -70,6 +71,7 @@ export function WordList({ groups, editingId, onEdit, onRemove, onRomaji }) {
       <ul className="list-group">
         {shown.map((group) => {
           const romaji = groupRomaji(group);
+          const kana = group.words.find((word) => word.kana)?.kana ?? '';
           return (
             <li
               key={group.key}
@@ -79,6 +81,12 @@ export function WordList({ groups, editingId, onEdit, onRemove, onRomaji }) {
             >
               <p className="d-flex flex-wrap align-items-center gap-2 mb-0 fs-5 font-display text-break">
                 <strong>{group.term}</strong>
+                <ListenButton word={group.words[0]} iconOnly />
+                {kana && kana !== group.term ? (
+                  <span className="fs-6 fw-normal text-body-secondary" lang="ja">
+                    {kana}
+                  </span>
+                ) : null}
                 {romaji ? (
                   <span className="fs-6 fw-normal text-body-secondary" lang="ja-Latn">
                     {romaji}

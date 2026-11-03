@@ -1,5 +1,7 @@
-import { exactKanjiFallback } from './fallbackDictionary.js';
+import { toHiragana, toKatakana } from 'wanakana';
+import { exactKanjiFallback, lookupKanjiFallback, readingsOfWritten } from './fallbackDictionary.js';
 import { fetchGoogleCandidates } from './ime.js';
+import { fetchRomaji, isKanaOnly } from './romaji.js';
 
 const HIRAGANA_ONLY_RE = /^[぀-ゟー]+$/;
 const KANJI_RE = /[㐀-䶿一-鿿]/;
@@ -53,4 +55,46 @@ export async function spellWithKanji(words, { fetchImpl, onProgress, concurrency
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, todo.length) }, worker));
   return result;
+}
+
+const MAX_SUGGESTIONS = 8;
+const unique = (list) => [...new Set(list.filter(Boolean))];
+
+/**
+ * Kanji spellings to suggest for a kana reading (べんきょう -> 勉強, 便橋, ...):
+ * Google Input Tools first, then the built-in dictionary. Katakana is read as
+ * hiragana. Never rejects because of the network.
+ */
+export async function kanjiCandidates(kana, { fetchImpl = globalThis.fetch, signal } = {}) {
+  const hiragana = toHiragana(String(kana ?? '').trim());
+  if (!isHiraganaOnly(hiragana)) return [];
+  let online = [];
+  try {
+    online = await fetchGoogleCandidates(hiragana, { fetchImpl, signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+  }
+  const withKanji = [...online, ...lookupKanjiFallback(hiragana)].filter((candidate) => KANJI_RE.test(candidate));
+  return unique(withKanji).slice(0, MAX_SUGGESTIONS);
+}
+
+/**
+ * Kana readings to suggest for a written word (勉強 -> べんきょう, ベンキョウ):
+ * the built-in dictionary, then Google's romanization, each in hiragana and katakana.
+ * A word written in kana suggests itself in both scripts. Never rejects because of the network.
+ */
+export async function readingCandidates(written, { fetchImpl = globalThis.fetch, signal } = {}) {
+  const text = String(written ?? '').trim();
+  if (!text) return [];
+  // ー stays a long-vowel mark (コーヒー -> こーひー), so the katakana comes back unchanged.
+  const readings = isKanaOnly(text) ? [toHiragana(text, { convertLongVowelMark: false })] : readingsOfWritten(text);
+  if (!isKanaOnly(text)) {
+    try {
+      const hiragana = toHiragana((await fetchRomaji(text, { fetchImpl, signal })).replace(/\s+/g, ''));
+      if (isHiraganaOnly(hiragana)) readings.push(hiragana);
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+    }
+  }
+  return unique(readings.flatMap((reading) => [reading, toKatakana(reading)])).slice(0, MAX_SUGGESTIONS);
 }

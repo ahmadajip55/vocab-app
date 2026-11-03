@@ -3,10 +3,12 @@ import { Button } from '../../components/Button.jsx';
 import { CollapsibleCard } from '../../components/CollapsibleCard.jsx';
 import { CheckboxField, SelectField, TextField } from '../../components/Fields.jsx';
 import { usePrograms } from '../../hooks/usePrograms.js';
-import { DEFAULT_LANGUAGES, LANGUAGE_OPTIONS, TARGET_LIMITS } from '../vocabulary/model.js';
+import { DEFAULT_LANGUAGES, TARGET_LIMITS } from '../vocabulary/model.js';
 import {
+  PROGRAM_LANGUAGE_OPTIONS,
   PROGRAM_NAME_LIMIT,
   levelOptionsFor,
+  parseProgramLanguage,
   validateProgramLevels,
   validateProgramName,
   validateProgramTarget,
@@ -27,7 +29,9 @@ const targetDraft = (settings) => ({
 export function ProgramForm() {
   const { programs, settings, addProgram } = usePrograms();
   const [name, setName] = useState('');
-  const [wordLanguage, setWordLanguage] = useState(DEFAULT_LANGUAGES.wordLanguage);
+  // A PROGRAM_LANGUAGE_OPTIONS value: a language code, or Japanese (Kanji).
+  const [languageChoice, setLanguageChoice] = useState(DEFAULT_LANGUAGES.wordLanguage);
+  const { wordLanguage, script } = parseProgramLanguage(languageChoice);
   const [levels, setLevels] = useState([]);
   const [targets, setTargets] = useState(() => targetDraft(settings));
   const [errors, setErrors] = useState({});
@@ -55,6 +59,7 @@ export function ProgramForm() {
     const program = addProgram(name, wordLanguage, levels, {
       masteredLevel: Number(targets.masteredLevel),
       passedLevel: Number(targets.passedLevel),
+      script,
     });
     setName('');
     setLevels([]);
@@ -83,15 +88,21 @@ export function ProgramForm() {
           <SelectField
             className="col-md-6"
             label="Word language"
-            value={wordLanguage}
+            value={languageChoice}
             onChange={(event) => {
-              setWordLanguage(event.target.value);
-              setLevels([]); // CEFR and JLPT levels do not carry over
+              const next = event.target.value;
+              // CEFR and JLPT levels do not carry over; Japanese and Japanese (Kanji) share JLPT.
+              if (parseProgramLanguage(next).wordLanguage !== wordLanguage) setLevels([]);
+              setLanguageChoice(next);
               setErrors((current) => ({ ...current, levels: undefined }));
             }}
-            hint="All words in this program use this language. It cannot be changed later."
+            hint={
+              script
+                ? 'Japanese words added with their kanji, kana reading and romaji. It cannot be changed later.'
+                : 'All words in this program use this language. It cannot be changed later.'
+            }
           >
-            {LANGUAGE_OPTIONS.map((option) => (
+            {PROGRAM_LANGUAGE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

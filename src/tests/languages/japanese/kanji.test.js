@@ -1,5 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
-import { isHiraganaOnly, kanjiSpelling, spellWithKanji } from '../../../languages/japanese/kanji.js';
+import { readingsOfWritten } from '../../../languages/japanese/fallbackDictionary.js';
+import {
+  isHiraganaOnly,
+  kanjiCandidates,
+  kanjiSpelling,
+  readingCandidates,
+  spellWithKanji,
+} from '../../../languages/japanese/kanji.js';
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 
@@ -113,5 +120,94 @@ describe('spellWithKanji', () => {
     const result = await spellWithKanji([], { fetchImpl });
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('kanjiCandidates', () => {
+  it('should suggest only the kanji spellings when Google returns kana too', async () => {
+    const { fetchImpl } = inputTools();
+
+    const candidates = await kanjiCandidates('みぎ', { fetchImpl });
+
+    expect(candidates).toEqual(['右']);
+  });
+
+  it('should read katakana as hiragana when the reading is in katakana', async () => {
+    const { fetchImpl, asked } = inputTools();
+
+    const candidates = await kanjiCandidates('ネコ', { fetchImpl });
+
+    expect(asked).toEqual(['ねこ']);
+    expect(candidates).toEqual(['猫']);
+  });
+
+  it('should use the built-in dictionary when Google cannot be reached', async () => {
+    const fetchImpl = offline;
+
+    const candidates = await kanjiCandidates('わたし', { fetchImpl });
+
+    expect(candidates).toContain('私');
+  });
+
+  it.each(['', 'abc', '右'])('should suggest nothing when the reading is %p', async (reading) => {
+    const { fetchImpl, asked } = inputTools();
+
+    const candidates = await kanjiCandidates(reading, { fetchImpl });
+
+    expect(candidates).toEqual([]);
+    expect(asked).toEqual([]);
+  });
+});
+
+describe('readingCandidates', () => {
+  /** Fake Google romanization: `table` maps the word to its romaji. */
+  const romanizer = (table) => async (url) => {
+    const word = new URL(url).searchParams.get('q');
+    return json([[[null, null, null, table[word] ?? '']]]);
+  };
+
+  it('should suggest the reading in hiragana and katakana when Google romanizes the word', async () => {
+    const fetchImpl = romanizer({ 勉強: 'Benkyō' });
+
+    const readings = await readingCandidates('勉強', { fetchImpl });
+
+    expect(readings).toEqual(['べんきょう', 'ベンキョウ']);
+  });
+
+  it('should put the built-in dictionary readings first when the word is in it', async () => {
+    const fetchImpl = romanizer({ 私: 'watashi' });
+
+    const readings = await readingCandidates('私', { fetchImpl });
+
+    expect(readings.slice(0, 2)).toEqual(['わたし', 'ワタシ']);
+    expect(readings).toContain('わたくし');
+  });
+
+  it('should suggest the word itself in both scripts when it is written in kana', async () => {
+    const fetchImpl = romanizer({});
+
+    const readings = await readingCandidates('コーヒー', { fetchImpl });
+
+    expect(readings).toEqual(['こーひー', 'コーヒー']);
+  });
+
+  it('should still use the built-in dictionary when Google cannot be reached', async () => {
+    const fetchImpl = offline;
+
+    const readings = await readingCandidates('私', { fetchImpl });
+
+    expect(readings).toContain('わたし');
+  });
+});
+
+describe('readingsOfWritten', () => {
+  it.each([
+    ['私', ['わたし', 'わたくし']],
+    ['', []],
+    ['無い言葉', []],
+  ])('should list the readings of %p as %j when the built-in dictionary is asked', (written, expected) => {
+    const readings = readingsOfWritten(written);
+
+    expect(readings).toEqual(expected);
   });
 });

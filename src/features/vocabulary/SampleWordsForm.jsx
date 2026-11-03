@@ -3,6 +3,7 @@ import { Button } from '../../components/Button.jsx';
 import { SelectField, TextField } from '../../components/Fields.jsx';
 import { useVocabulary } from '../../hooks/useVocabulary.js';
 import { getLanguage } from '../../languages/index.js';
+import { isKanaOnly, toKanaReading } from '../../languages/japanese/romaji.js';
 import { translateTerms } from './aiMeaning.js';
 import { defaultMeaningLanguage, meaningLanguageOptions } from './model.js';
 import { SAMPLE_MAX, fetchSampleTerms } from './sampleSource.js';
@@ -59,6 +60,8 @@ export function SampleWordsForm({ onAdded }) {
         found.terms.map((term, index) => ({
           term,
           romaji: found.romaji[index],
+          // The reading in kana, for words written with kanji (勉強 -> べんきょう).
+          kana: program.wordLanguage === 'ja' && !isKanaOnly(term) ? toKanaReading(found.romaji[index]) : '',
           meaning: translated.meanings[index],
           meaningLanguage,
         })),

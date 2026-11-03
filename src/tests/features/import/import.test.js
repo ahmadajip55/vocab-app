@@ -272,10 +272,72 @@ describe('planImport', () => {
   });
 });
 
+describe('kanji programs', () => {
+  it('should read kanji, kana and meaning in that order when there is no header', () => {
+    const rows = [['勉強', 'べんきょう', 'study'], ['先生', '', 'teacher']];
+
+    const { words, hasHeader } = rowsToWords(rows, { kanji: true });
+
+    expect(hasHeader).toBe(false);
+    expect(words.map(({ term, kana, meaning }) => [term, kana, meaning])).toEqual([
+      ['勉強', 'べんきょう', 'study'],
+      ['先生', '', 'teacher'],
+    ]);
+  });
+
+  it('should match the Kanji, Hiragana and Romaji columns when they have headers', () => {
+    const rows = [['Meaning', 'Romaji', 'Hiragana', 'Kanji'], ['water', 'mizu', 'みず', '水']];
+
+    const { words } = rowsToWords(rows, { kanji: true });
+
+    expect(words[0]).toMatchObject({ term: '水', kana: 'みず', romaji: 'mizu', meaning: 'water' });
+  });
+
+  it('should keep a row with only a reading when the kanji is missing', () => {
+    const rows = [['Kanji', 'Kana', 'Meaning'], ['', 'みず', 'water'], ['', '', 'nothing']];
+
+    const { words, issues } = rowsToWords(rows, { kanji: true });
+
+    expect(words.map((word) => [word.term, word.kana])).toEqual([['', 'みず']]);
+    expect(issues).toEqual([{ row: 3, reason: 'Kolom Kanji dan Kana kosong.' }]);
+  });
+
+  it('should ask for a Kanji or Kana column when the header has neither', () => {
+    const rows = [['Meaning', 'Notes'], ['a', 'b']];
+
+    const { fatal } = rowsToWords(rows, { kanji: true });
+
+    expect(fatal).toMatch(/"Kanji" atau "Kana"/);
+  });
+
+  it.each([
+    ['日本, にほん, Japan, the country', ['日本', 'にほん', 'Japan, the country']],
+    ['日本, , Japan', ['日本', '', 'Japan']],
+    ['日本, にほん', ['日本', 'にほん', '']],
+    ['日本, Japan', ['日本', '', 'Japan']],
+    [', みず, water', ['', 'みず', 'water']],
+    ['日本', ['日本', '', '']],
+  ])('should read %p as %j when kanji text is pasted', (text, expected) => {
+    const [row] = parsePastedText(text, { kanji: true });
+
+    expect(row).toEqual(expected);
+  });
+
+  it('should keep the word-and-meaning format when the program is not a kanji program', () => {
+    const text = 'thrive, tumbuh subur, berkembang';
+
+    const [row] = parsePastedText(text);
+
+    expect(row).toEqual(['thrive', 'tumbuh subur, berkembang']);
+  });
+});
+
 describe('spreadsheet files', () => {
   it.each([
     ['the template', () => buildTemplateXlsx()],
     ['an export', () => buildWordsXlsx([{ term: 'a', meaning: 'b' }])],
+    ['the kanji template', () => buildTemplateXlsx({ kanji: true })],
+    ['a kanji export', () => buildWordsXlsx([{ term: '水', kana: 'みず', romaji: 'mizu', meaning: 'water' }], { kanji: true })],
   ])('should write a non-empty zip file when building %s', (_, build) => {
     const bytes = build();
 

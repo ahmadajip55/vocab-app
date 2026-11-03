@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { Button, ButtonLink } from '../../components/Button.jsx';
 import { ConfirmButton } from '../../components/ConfirmButton.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
-import { getLanguage } from '../../languages/index.js';
+import { programLanguageLabel } from '../vocabulary/programs.js';
 import { quizProgressOf, summarizeWords, targetsOf } from '../vocabulary/model.js';
 import { ProgramLevels } from './ProgramLevels.jsx';
 import { ProgramProgress } from './ProgramProgress.jsx';
@@ -23,7 +23,7 @@ export function ProgramCard({ program, words, open, onToggle, onRemove }) {
         </div>
         <div className="d-flex flex-wrap align-items-center gap-2 ms-auto">
           <span className="small text-body-secondary">
-            {getLanguage(program.wordLanguage).label} · {summary.total} words, {summary.mastered} mastered
+            {programLanguageLabel(program)} · {summary.total} words, {summary.mastered} mastered
             {summary.passed > 0 ? (
               <>
                 {' '}

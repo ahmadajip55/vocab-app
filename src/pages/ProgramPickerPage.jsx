@@ -3,7 +3,7 @@ import { ButtonLink } from '../components/Button.jsx';
 import { EmptyState } from '../components/EmptyState.jsx';
 import { PageHeader } from '../components/PageHeader.jsx';
 import { ProgramLevels } from '../features/programs/ProgramLevels.jsx';
-import { getLanguage } from '../languages/index.js';
+import { programLanguageLabel } from '../features/vocabulary/programs.js';
 import { summarizeWords, targetsOf } from '../features/vocabulary/model.js';
 import { usePrograms } from '../hooks/usePrograms.js';
 
@@ -34,7 +34,7 @@ export default function ProgramPickerPage({ section }) {
                   <strong className="fs-5">{program.name}</strong>
                   <ProgramLevels levels={program.levels} />
                   <span className="small text-body-secondary">
-                    {getLanguage(program.wordLanguage).label} · {summary.total} words · {summary.mastered} mastered
+                    {programLanguageLabel(program)} · {summary.total} words · {summary.mastered} mastered
                   </span>
                 </Link>
               </li>

@@ -6,7 +6,7 @@ import {
   getLanguage,
   normalizeLanguageCode,
 } from '../../languages/index.js';
-import { normalizeRomaji } from '../../languages/japanese/romaji.js';
+import { kanaToRomaji, normalizeRomaji, toKanaReading } from '../../languages/japanese/romaji.js';
 import { createId } from '../../lib/id.js';
 import { cleanText, lowerText, normalizeText, titleText } from '../../lib/text.js';
 
@@ -98,7 +98,8 @@ export function getWordSuggestions(words = [], query = '', language = DEFAULT_LA
 
 /**
  * Word shape:
- * { id, term, meaning, wordLanguage, meaningLanguage, romaji, mastery (0 to the mastered target), quizPassed, attempts, correctCount, createdAt }
+ * { id, term, meaning, wordLanguage, meaningLanguage, romaji, kana, mastery (0 to the mastered target), quizPassed, attempts, correctCount, createdAt }
+ * romaji and kana (the reading of a word with kanji, e.g. 勉強 -> べんきょう) are for Japanese only.
  * mastery goes up by one for each correct answer and drops to 0 on a wrong one.
  * quizPassed counts correct quiz answers only; at the program's `passed` target the word is 'Passed'.
  */
@@ -121,6 +122,7 @@ export function createWord(input, now = Date.now()) {
     wordLanguage,
     meaningLanguage,
     romaji: wordLanguage === 'ja' ? normalizeRomaji(input.romaji) : '',
+    kana: wordLanguage === 'ja' ? toKanaReading(input.kana) : '',
     mastery: 0,
     quizPassed: 0,
     attempts: 0,
@@ -129,20 +131,38 @@ export function createWord(input, now = Date.now()) {
   };
 }
 
+const REQUIRED = { term: 'Isi kata terlebih dahulu.', meaning: 'Isi arti terlebih dahulu.' };
+
+/** Errors by field for a word about to be saved; both the word and its meaning are required. */
 export function validateWordInput(input) {
   const errors = {};
-  if (!cleanText(input.term)) errors.term = 'Isi kata terlebih dahulu.';
   for (const [field, max] of Object.entries(LIMITS)) {
-    if (field === 'meaning') continue;
-    if (!errors[field] && cleanText(input[field]).length > max) {
-      errors[field] = `Maksimal ${max} karakter.`;
-    }
-  }
-  if (!cleanText(input.meaning)) errors.meaning = 'Isi arti terlebih dahulu.';
-  else if (cleanText(input.meaning).length > LIMITS.meaning) {
-    errors.meaning = `Maksimal ${LIMITS.meaning} karakter.`;
+    const text = cleanText(input[field]);
+    if (!text) errors[field] = REQUIRED[field];
+    else if (text.length > max) errors[field] = `Maksimal ${max} karakter.`;
   }
   return errors;
+}
+
+/**
+ * The Add word form's values as they are saved: the word in its language's form
+ * and, for Japanese, its kana reading and romaji. `readings` maps the text typed
+ * into the word field to the romaji typed for it (so kanji keep their reading).
+ */
+export function toWordValues(values, readings = {}) {
+  const language = getLanguage(values.wordLanguage);
+  const term = language.normalizeTerm(values.term ?? '').trim();
+  if (language.code !== 'ja') return { ...values, term, kana: '', romaji: '' };
+  const kana = toKanaReading(values.kana);
+  return { ...values, term, kana, romaji: kanaToRomaji(kana) || (readings[term] ?? kanaToRomaji(term)) };
+}
+
+/** Why `duplicate` (the same word, already saved) blocks adding another one in `meaningLanguage`. */
+export function duplicateWordMessage(duplicate, meaningLanguage) {
+  const target = getLanguage(meaningLanguage).label;
+  return duplicate.meaning
+    ? `"${duplicate.term}" already has a ${target} meaning: "${duplicate.meaning}". Choose another meaning language or edit that one.`
+    : `"${duplicate.term}" already has a ${target} entry. Choose another meaning language or edit that one.`;
 }
 
 export function termKey(term) {

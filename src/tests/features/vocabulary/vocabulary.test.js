@@ -6,6 +6,7 @@ import {
   createWord,
   defaultMeaningLanguage,
   detectWordLanguage,
+  duplicateWordMessage,
   findByTerm,
   getStatus,
   getWordSuggestions,
@@ -19,10 +20,12 @@ import {
   targetsOf,
   termKey,
   toJapaneseReading,
+  toWordValues,
   validateWordInput,
 } from '../../../features/vocabulary/model.js';
 import { initialVocabularyState, vocabularyReducer } from '../../../features/vocabulary/reducer.js';
 import { decodeStored, loadWords, sanitizeWords, saveWords, STORAGE_KEY } from '../../../features/vocabulary/storage.js';
+import { memoryStorage } from '../../helpers/memoryStorage.js';
 
 const word = (term, meaning, extra = {}) => ({ ...createWord({ term, meaning }), ...extra });
 
@@ -31,17 +34,6 @@ function answered(start, times, correct, source) {
   let result = start;
   for (let i = 0; i < times; i++) result = applyResult(result, correct, source);
   return result;
-}
-
-function fakeStorage(initial = {}) {
-  const data = { ...initial };
-  return {
-    data,
-    getItem: (key) => (key in data ? data[key] : null),
-    setItem: (key, value) => {
-      data[key] = value;
-    },
-  };
 }
 
 describe('createWord', () => {
@@ -145,6 +137,61 @@ describe('validateWordInput', () => {
     const errors = validateWordInput(input);
 
     expect(errors.term).toBeTruthy();
+  });
+});
+
+describe('toWordValues', () => {
+  it('should trim the word and leave out kana and romaji when the language is not Japanese', () => {
+    const values = { term: '  thrive ', meaning: 'Berkembang', kana: 'x', wordLanguage: 'en', meaningLanguage: 'id' };
+
+    const result = toWordValues(values);
+
+    expect([result.term, result.kana, result.romaji]).toEqual(['thrive', '', '']);
+  });
+
+  it('should take the romaji from the kana when a kanji word has its reading', () => {
+    const values = { term: '食べる', kana: 'たべる', wordLanguage: 'ja' };
+
+    const result = toWordValues(values);
+
+    expect([result.kana, result.romaji]).toEqual(['たべる', 'taberu']);
+  });
+
+  it('should use the romaji typed for the word when it has no kana', () => {
+    const values = { term: '日本', kana: '', wordLanguage: 'ja' };
+
+    const result = toWordValues(values, { 日本: 'nihon' });
+
+    expect(result.romaji).toBe('nihon');
+  });
+
+  it('should read the romaji from the word itself when the word is kana', () => {
+    const values = { term: 'みず', wordLanguage: 'ja' };
+
+    const result = toWordValues(values);
+
+    expect(result.romaji).toBe('mizu');
+  });
+
+  it('should turn a romaji reading into hiragana when the kana field holds romaji', () => {
+    const values = { term: '水', kana: 'mizu', wordLanguage: 'ja' };
+
+    const result = toWordValues(values);
+
+    expect(result.kana).toBe('みず');
+  });
+});
+
+describe('duplicateWordMessage', () => {
+  it.each([
+    [{ term: 'Thrive', meaning: 'Berkembang' }, '"Thrive" already has a Indonesian meaning: "Berkembang". Choose another meaning language or edit that one.'],
+    [{ term: 'Thrive', meaning: '' }, '"Thrive" already has a Indonesian entry. Choose another meaning language or edit that one.'],
+  ])('should explain the clash when %j is already saved', (duplicate, expected) => {
+    const meaningLanguage = 'id';
+
+    const message = duplicateWordMessage(duplicate, meaningLanguage);
+
+    expect(message).toBe(expected);
   });
 });
 
@@ -537,7 +584,7 @@ describe('saving and loading words', () => {
   ];
 
   it('should store the term, meaning, languages and progress when words are saved', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
 
     const saved = saveWords(words, storage);
 
@@ -549,7 +596,7 @@ describe('saving and loading words', () => {
   });
 
   it('should compress the list when words are saved', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     const many = Array.from({ length: 200 }, (_, i) => ({ ...words[i % 2], id: `w${i}`, term: `word ${i}` }));
 
     saveWords(many, storage);
@@ -561,7 +608,7 @@ describe('saving and loading words', () => {
   });
 
   it('should read the list when it was saved as plain JSON', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, words }));
 
     const loaded = loadWords(storage);
@@ -570,7 +617,7 @@ describe('saving and loading words', () => {
   });
 
   it('should return an empty list when the compressed data is damaged', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     storage.setItem(STORAGE_KEY, 'lz:\u0001garbage');
 
     const loaded = loadWords(storage);
@@ -579,7 +626,7 @@ describe('saving and loading words', () => {
   });
 
   it('should restore the clean shape in Title Case when words are loaded', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     saveWords(words, storage);
 
     const loaded = loadWords(storage);
@@ -591,7 +638,7 @@ describe('saving and loading words', () => {
   });
 
   it('should keep the Passed count when the page is reloaded', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     saveWords([word('a', 'b', { quizPassed: 100 })], storage);
 
     const [loaded] = loadWords(storage);
@@ -600,7 +647,7 @@ describe('saving and loading words', () => {
   });
 
   it.each([
-    ['corrupt data', fakeStorage({ [STORAGE_KEY]: '{not json' })],
+    ['corrupt data', memoryStorage({ [STORAGE_KEY]: '{not json' })],
     ['no storage', null],
     ['an empty value', { getItem: () => '' }],
     ['a blocked storage', { getItem() { throw new Error('blocked'); } }],

@@ -3,7 +3,7 @@ import { applyResult, resetProgress, termKey } from './model.js';
 
 export const initialVocabularyState = { words: [] };
 
-const EDITABLE_FIELDS = ['term', 'meaning', 'wordLanguage', 'meaningLanguage', 'romaji'];
+const EDITABLE_FIELDS = ['term', 'meaning', 'wordLanguage', 'meaningLanguage', 'romaji', 'kana'];
 const TITLE_CASE_FIELDS = new Set(['term', 'meaning']);
 
 function pickEditable(changes) {

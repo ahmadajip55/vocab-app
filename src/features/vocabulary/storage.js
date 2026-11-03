@@ -2,9 +2,9 @@ import LZString from 'lz-string';
 import { createId } from '../../lib/id.js';
 import { cleanText, titleText } from '../../lib/text.js';
 import { getLanguage } from '../../languages/index.js';
-import { normalizeRomaji } from '../../languages/japanese/romaji.js';
+import { normalizeRomaji, toKanaReading } from '../../languages/japanese/romaji.js';
 import { DEFAULT_LANGUAGES, DEFAULT_TARGETS, LIMITS, TARGET_LIMITS, normalizeLanguageCode, sanitizeTarget } from './model.js';
-import { PROGRAM_NAME_LIMIT, sanitizeLevels } from './programs.js';
+import { KANJI_SCRIPT, PROGRAM_NAME_LIMIT, sanitizeLevels } from './programs.js';
 
 /** Legacy key from before programs existed; still the default for loadWords/saveWords. */
 export const STORAGE_KEY = 'vocab-app:v1';
@@ -13,7 +13,7 @@ export const SETTINGS_KEY = 'vocab-app:settings';
 const SCHEMA_VERSION = 1;
 // Word lists are saved compressed (lz-string, safe for UTF-16 storage), several times smaller than JSON.
 const COMPRESSED_PREFIX = 'lz:';
-const PROGRAM_FIELDS = ['id', 'name', 'wordLanguage', 'levels', 'masteredLevel', 'passedLevel', 'createdAt'];
+const PROGRAM_FIELDS = ['id', 'name', 'wordLanguage', 'levels', 'masteredLevel', 'passedLevel', 'script', 'createdAt'];
 
 /** Each program keeps its words under its own key. */
 export function programWordsKey(programId) {
@@ -77,6 +77,7 @@ function normalizePersistedWord(item) {
     wordLanguage,
     meaningLanguage: languageOr(item.meaningLanguage, DEFAULT_LANGUAGES.meaningLanguage),
     romaji: wordLanguage === 'ja' ? normalizeRomaji(item.romaji).slice(0, LIMITS.term * 4) : '',
+    kana: wordLanguage === 'ja' ? toKanaReading(item.kana).slice(0, LIMITS.term * 2) : '',
     mastery: Math.min(TARGET_LIMITS.max, toCount(item.mastery)),
     quizPassed: toCount(item.quizPassed),
     attempts: toCount(item.attempts),
@@ -136,6 +137,8 @@ function serializeForStorage(word) {
   if (meaning) persisted.meaning = meaning;
   const romaji = wordLanguage === 'ja' ? normalizeRomaji(word.romaji) : '';
   if (romaji) persisted.romaji = romaji;
+  const kana = wordLanguage === 'ja' ? toKanaReading(word.kana) : '';
+  if (kana) persisted.kana = kana;
 
   return persisted;
 }
@@ -168,6 +171,7 @@ export function sanitizePrograms(raw) {
       levels: Array.isArray(item.levels) ? item.levels : [],
       // Programs saved before targets existed keep the defaults.
       ...cleanSettings(item),
+      script: item.script === KANJI_SCRIPT ? KANJI_SCRIPT : null,
       createdAt: timestamp(item.createdAt),
     };
   });
@@ -199,7 +203,7 @@ function migrateLegacyWords(words) {
   const wordsByProgram = {};
   for (const [wordLanguage, list] of byLanguage) {
     const name = byLanguage.size > 1 ? `My words (${getLanguage(wordLanguage).label})` : 'My words';
-    const program = { id: createId(), name, wordLanguage, levels: [], ...cleanSettings(null), createdAt: Date.now() };
+    const program = { id: createId(), name, wordLanguage, levels: [], ...cleanSettings(null), script: null, createdAt: Date.now() };
     programs.push(program);
     wordsByProgram[program.id] = list;
   }
@@ -239,7 +243,12 @@ export function settlePrograms(programs, wordsOf) {
     const words = wordsOf(program);
     const wordLanguage = program.wordLanguage ?? mostUsedLanguage(words);
     wordsByProgram[program.id] = words.map((word) => (word.wordLanguage === wordLanguage ? word : { ...word, wordLanguage }));
-    return { ...program, wordLanguage, levels: sanitizeLevels(program.levels, wordLanguage) };
+    return {
+      ...program,
+      wordLanguage,
+      levels: sanitizeLevels(program.levels, wordLanguage),
+      script: wordLanguage === 'ja' ? (program.script ?? null) : null,
+    };
   });
   return { programs: settled, wordsByProgram };
 }

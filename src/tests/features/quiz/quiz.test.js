@@ -87,7 +87,7 @@ describe('generateQuiz', () => {
 
     const expectedWord = (text) => {
       const word = japanese.find((item) => item.term === text);
-      return { id: word.id, term: word.term, wordLanguage: 'ja', romaji: word.romaji ?? '' };
+      return { id: word.id, term: word.term, wordLanguage: 'ja', romaji: word.romaji ?? '', kana: word.kana ?? '' };
     };
 
     const [question] = generateQuiz(japanese, { count: 1, type: 'choice', direction: 'meaning-to-term' }, createSeededRng(2));

@@ -67,6 +67,11 @@ export function ImportPreview({ draft, meaningLanguage }) {
                         {word.reading}
                       </span>
                     ) : null}
+                    {word.romaji ? (
+                      <span className="ms-2 small text-body-secondary" lang="ja-Latn">
+                        {word.romaji}
+                      </span>
+                    ) : null}
                   </td>
                   <td lang={meaningLanguage}>{word.meaning ? (
                       <>

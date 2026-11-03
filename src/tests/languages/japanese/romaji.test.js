@@ -8,6 +8,7 @@ import {
   needsRomajiLookup,
   normalizeRomaji,
   romajiForWord,
+  toKanaReading,
 } from '../../../languages/japanese/romaji.js';
 import { createWord } from '../../../features/vocabulary/model.js';
 import { parseJlptEntries } from '../../../features/vocabulary/sampleSource.js';
@@ -185,5 +186,61 @@ describe('japaneseReading', () => {
     const reading = japaneseReading(word);
 
     expect(reading).toBeNull();
+  });
+});
+
+describe('toKanaReading', () => {
+  it.each([
+    ['benkyou', 'べんきょう'],
+    ['Sensei', 'せんせい'],
+    ['べんきょう', 'べんきょう'],
+    ['コーヒー', 'コーヒー'],
+    [' に ほん ', 'にほん'],
+    ['勉強', ''],
+    ['', ''],
+  ])('should turn %p into %p when a kana reading is typed', (typed, expected) => {
+    const reading = toKanaReading(typed);
+
+    expect(reading).toBe(expected);
+  });
+});
+
+describe('a saved kana reading', () => {
+  it('should be shown as it is, katakana included, when the word has kanji', () => {
+    const word = { wordLanguage: 'ja', term: '珈琲', kana: 'コーヒー', romaji: '' };
+
+    const reading = japaneseReading(word);
+
+    expect(reading).toEqual({ kana: 'コーヒー', romaji: 'koohii' });
+  });
+
+  it('should give the romaji when no romaji is saved', () => {
+    const word = { wordLanguage: 'ja', term: '勉強', kana: 'べんきょう', romaji: '' };
+
+    const romaji = romajiForWord(word);
+
+    expect(romaji).toBe('benkyou');
+  });
+
+  it('should be kept on Japanese words only when a word is created', () => {
+    const inputs = [
+      { term: '勉強', kana: 'benkyou', wordLanguage: 'ja' },
+      { term: 'study', kana: 'べんきょう', wordLanguage: 'en' },
+    ];
+
+    const words = inputs.map((input) => createWord(input));
+
+    expect(words.map((word) => word.kana)).toEqual(['べんきょう', '']);
+  });
+
+  it('should survive a reload when Japanese words are saved', () => {
+    const data = {};
+    const storage = { getItem: (key) => data[key] ?? null, setItem: (key, value) => (data[key] = value) };
+    const words = [createWord({ term: '珈琲', kana: 'コーヒー', wordLanguage: 'ja' })];
+
+    saveWords(words, storage);
+    const reloaded = loadWords(storage);
+
+    expect(reloaded[0].kana).toBe('コーヒー');
   });
 });

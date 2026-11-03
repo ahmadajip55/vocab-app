@@ -374,3 +374,12 @@ export function lookupKanjiFallback(reading, limit = 8) {
 export function exactKanjiFallback(reading) {
   return ENTRIES.get(String(reading ?? ''))?.[0] ?? '';
 }
+
+/** Hiragana readings of a written form (私 -> わたし, わたくし), from the built-in dictionary. */
+export function readingsOfWritten(written) {
+  const key = String(written ?? '');
+  if (!key) return [];
+  const readings = [];
+  for (const [reading, forms] of ENTRIES) if (forms.includes(key)) readings.push(reading);
+  return readings;
+}

@@ -2,7 +2,10 @@ import { normalizeText } from '../../lib/text.js';
 
 /** Header names (Indonesian and English) recognised for each field. */
 const COLUMN_ALIASES = {
-  term: ['kata', 'word', 'term', 'vocabulary', 'vocab', 'kosakata', 'english', 'inggris', 'bahasa inggris', 'kata inggris'],
+  term: ['kata', 'word', 'term', 'vocabulary', 'vocab', 'kosakata', 'english', 'inggris', 'bahasa inggris', 'kata inggris', 'kanji'],
+  // Japanese: the kana reading and romaji of a word
+  kana: ['kana', 'hiragana', 'katakana', 'hiragana/katakana', 'reading', 'furigana', 'yomi', 'yomigana', 'bacaan', 'cara baca'],
+  romaji: ['romaji', 'romanization', 'romanisation', 'romanisasi'],
   meaning: [
     'arti',
     'meaning',
@@ -21,12 +24,15 @@ const COLUMN_ALIASES = {
 /** Column order assumed when the first row is not a recognisable header: word, then meaning. */
 export const POSITIONAL_COLUMNS = { term: 0, meaning: 1 };
 
+/** The same for a kanji program: kanji, kana reading, then meaning. */
+export const KANJI_POSITIONAL_COLUMNS = { term: 0, kana: 1, meaning: 2 };
+
 const lookup = new Map();
 for (const [field, aliases] of Object.entries(COLUMN_ALIASES)) {
   for (const alias of aliases) lookup.set(normalizeText(alias), field);
 }
 
-const IMPORTED_FIELDS = ['term', 'meaning'];
+const IMPORTED_FIELDS = ['term', 'meaning', 'kana', 'romaji'];
 
 /** Map field name to column index for a header row. Unknown headers are ignored. */
 export function detectColumns(headerRow) {

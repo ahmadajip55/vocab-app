@@ -1,11 +1,45 @@
 import { createId } from '../../lib/id.js';
 import { cleanText, normalizeText } from '../../lib/text.js';
-import { DEFAULT_LANGUAGES, DEFAULT_TARGETS, TARGET_LIMITS, normalizeLanguageCode, sanitizeTarget, targetsOf } from './model.js';
+import { getLanguage } from '../../languages/index.js';
+import {
+  DEFAULT_LANGUAGES,
+  DEFAULT_TARGETS,
+  LANGUAGE_OPTIONS,
+  TARGET_LIMITS,
+  normalizeLanguageCode,
+  sanitizeTarget,
+  targetsOf,
+} from './model.js';
 import { vocabularyReducer } from './reducer.js';
 
 export const PROGRAM_NAME_LIMIT = 60;
 
 export const initialProgramsState = { programs: [], wordsByProgram: {} };
+
+/**
+ * A Japanese program can focus on kanji (`script: 'kanji'`): its words are added
+ * with three fields (kanji, kana reading, romaji). It is still Japanese ('ja')
+ * for everything else: input method, readings, speech, JLPT levels, translation.
+ */
+export const KANJI_SCRIPT = 'kanji';
+const KANJI_OPTION = { value: 'ja-kanji', label: 'Japanese (Kanji)' };
+
+/** Word language choices for a new program: the languages, plus Japanese (Kanji) after Japanese. */
+export const PROGRAM_LANGUAGE_OPTIONS = LANGUAGE_OPTIONS.flatMap((option) => (option.value === 'ja' ? [option, KANJI_OPTION] : [option]));
+
+/** A choice from PROGRAM_LANGUAGE_OPTIONS -> { wordLanguage, script }. */
+export function parseProgramLanguage(value) {
+  return value === KANJI_OPTION.value ? { wordLanguage: 'ja', script: KANJI_SCRIPT } : { wordLanguage: value, script: null };
+}
+
+export function isKanjiProgram(program) {
+  return program?.wordLanguage === 'ja' && program?.script === KANJI_SCRIPT;
+}
+
+/** "Japanese (Kanji)" for a kanji program, otherwise the language name. */
+export function programLanguageLabel(program) {
+  return isKanjiProgram(program) ? KANJI_OPTION.label : getLanguage(program?.wordLanguage).label;
+}
 
 const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
@@ -35,8 +69,9 @@ export function validateProgramTarget(value) {
 }
 
 /**
- * A new program, studying words in exactly one word language. `settings` are its
- * learning targets ({ masteredLevel, passedLevel }); the program keeps them from then on.
+ * A new program, studying words in exactly one word language. `settings` holds its
+ * learning targets ({ masteredLevel, passedLevel }), which it keeps from then on,
+ * and `script: 'kanji'` for a Japanese kanji program.
  */
 export function createProgram(name, wordLanguage = DEFAULT_LANGUAGES.wordLanguage, levels = [], settings = {}) {
   const language = normalizeLanguageCode(wordLanguage, DEFAULT_LANGUAGES.wordLanguage);
@@ -47,6 +82,7 @@ export function createProgram(name, wordLanguage = DEFAULT_LANGUAGES.wordLanguag
     levels: sanitizeLevels(levels, language),
     masteredLevel: sanitizeTarget(settings.masteredLevel, DEFAULT_TARGETS.mastered),
     passedLevel: sanitizeTarget(settings.passedLevel, DEFAULT_TARGETS.passed),
+    script: language === 'ja' && settings.script === KANJI_SCRIPT ? KANJI_SCRIPT : null,
     createdAt: Date.now(),
   };
 }

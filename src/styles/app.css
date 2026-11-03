@@ -120,6 +120,14 @@ body {
   }
 }
 
+/* Speaker button next to a word in the word list. */
+.listen-icon {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.4rem;
+  line-height: 1;
+}
+
 /* Small progress bars next to a word (mastery, quiz). */
 .mini-progress {
   width: 56px;

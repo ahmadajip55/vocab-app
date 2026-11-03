@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import { Button } from '../../components/Button.jsx';
 import { ImeTextField } from '../../components/ImeTextField.jsx';
 import { JapaneseReading } from '../../components/JapaneseReading.jsx';
+import { ListenButton, SpeechSpeedToggle } from '../../components/ListenButton.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
 import { getLanguage } from '../../languages/index.js';
 import { checkTypedAnswer } from './checkAnswer.js';
@@ -113,6 +114,13 @@ export function QuizSession({ questions, onResult, onRetryMissed, onNewQuiz, onR
           {/* Under the word only when the word is the question; otherwise it would give the answer away. */}
           {!answersTerm ? <JapaneseReading word={question.word} onRomaji={onRomaji} /> : null}
         </p>
+        {/* The word can be heard when it is the question; otherwise only after answering. */}
+        {!answersTerm ? (
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <ListenButton word={question.word} size="small" />
+            <SpeechSpeedToggle />
+          </div>
+        ) : null}
 
         {question.type === 'choice' ? (
           <ul className="row row-cols-1 row-cols-md-2 g-2 list-unstyled mb-0">
@@ -196,9 +204,12 @@ export function QuizSession({ questions, onResult, onRetryMissed, onNewQuiz, onR
             ) : null}
             {answersTerm ? (
               <p className="mb-0">
-                <strong lang="ja">{question.word.term}</strong>
+                <strong lang={question.termLanguage}>{question.word.term}</strong>
                 <JapaneseReading word={question.word} onRomaji={onRomaji} />
               </p>
+            ) : null}
+            {answersTerm ? (
+              <ListenButton word={question.word} size="small" label="Listen to the word" />
             ) : null}
             <Button variant="primary" ref={nextRef} onClick={goNext}>
               {isLast ? 'See results' : 'Next question'}

@@ -1,15 +1,24 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/Button.jsx';
 import { CharPalette } from '../../components/CharPalette.jsx';
 import { SelectField, TextField } from '../../components/Fields.jsx';
 import { ImeTextField } from '../../components/ImeTextField.jsx';
 import { getLanguage } from '../../languages/index.js';
-import { extendReadings, kanaToRomaji } from '../../languages/japanese/romaji.js';
+import { extendReadings } from '../../languages/japanese/romaji.js';
 import { toTitleCase } from '../../lib/text.js';
 import { lookupWordMeaning } from './aiMeaning.js';
-import { LIMITS, defaultMeaningLanguage, getWordSuggestions, meaningLanguageOptions, validateWordInput } from './model.js';
+import { KanjiWordFields } from './KanjiWordFields.jsx';
+import {
+  LIMITS,
+  defaultMeaningLanguage,
+  duplicateWordMessage,
+  getWordSuggestions,
+  meaningLanguageOptions,
+  toWordValues,
+  validateWordInput,
+} from './model.js';
 
-const EMPTY = { term: '', meaning: '' };
+const EMPTY = { term: '', meaning: '', kana: '' };
 
 const TERM_PLACEHOLDERS = {
   ja: 'type romaji, e.g. nihongo',
@@ -26,6 +35,7 @@ const TERM_PLACEHOLDERS = {
  * - Pass onCancel when editing; the form then keeps its values after saving.
  *
  * - wordLanguage is the program's word language; every word in it uses that language.
+ * - kanjiMode (a Japanese kanji program) asks for the kanji, its kana reading and romaji (see KanjiWordFields).
  * - className replaces the form's own card styling, e.g. when it sits inside another card.
  *
  * Everything that depends on the word language (input method, keyboard hints,
@@ -39,6 +49,7 @@ export function WordForm({
   findDuplicate,
   wordSuggestions = [],
   wordLanguage,
+  kanjiMode = false,
   className = 'card card-body vstack gap-3',
 }) {
   // A new word starts with the meaning language most of the program's words use.
@@ -86,6 +97,10 @@ export function WordForm({
     resetAutoFill({ keepManual: true });
   }
 
+  function setKana(kana) {
+    setValues((current) => ({ ...current, kana }));
+  }
+
   const change = (field) => (event) => {
     const value = toTitleKeepingCaret(event.target, field);
 
@@ -119,6 +134,13 @@ export function WordForm({
     });
   }
 
+  /** Puts a looked-up meaning into the field. */
+  const showMeaning = useCallback((meaning) => {
+    setValues((current) => ({ ...current, meaning }));
+    setErrors((current) => ({ ...current, meaning: undefined }));
+    setAiStatus('Meaning filled automatically (free translator, no API key).');
+  }, []);
+
   /** The word as it will be saved, but only once the user is done typing it. */
   const settledTerm = language.ime && composing ? '' : language.normalizeTerm(values.term).trim();
   const languagePair = `${wordLanguage}>${values.meaningLanguage}`;
@@ -136,14 +158,8 @@ export function WordForm({
       setAiLoading(true);
       setAiStatus(`Translating into ${getLanguage(values.meaningLanguage).label}…`);
       try {
-        const meaning = await lookupWordMeaning(settledTerm, {
-          sourceLanguage: wordLanguage,
-          targetLanguage: values.meaningLanguage,
-        });
-        if (!isCurrent()) return;
-        setValues((current) => ({ ...current, meaning }));
-        setErrors((current) => ({ ...current, meaning: undefined }));
-        setAiStatus('Meaning filled automatically (free translator, no API key).');
+        const meaning = await lookupWordMeaning(settledTerm, { sourceLanguage: wordLanguage, targetLanguage: values.meaningLanguage });
+        if (isCurrent()) showMeaning(meaning);
       } catch (error) {
         if (isCurrent()) setAiStatus(error.message || 'Failed to translate this word.');
       } finally {
@@ -152,7 +168,7 @@ export function WordForm({
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [settledTerm, languagePair, meaningIsEmpty, wordLanguage, values.meaningLanguage]);
+  }, [settledTerm, languagePair, meaningIsEmpty, wordLanguage, values.meaningLanguage, showMeaning]);
 
   function requireTerm() {
     if (settledTerm) return true;
@@ -167,14 +183,9 @@ export function WordForm({
     setAiLoading(true);
     setAiStatus('');
     try {
-      const meaning = await lookupWordMeaning(settledTerm, {
-        sourceLanguage: wordLanguage,
-        targetLanguage: values.meaningLanguage,
-      });
-      setValues((current) => ({ ...current, meaning }));
-      setErrors((current) => ({ ...current, meaning: undefined }));
+      const meaning = await lookupWordMeaning(settledTerm, { sourceLanguage: wordLanguage, targetLanguage: values.meaningLanguage });
       manualMeaningRef.current = false;
-      setAiStatus('Meaning filled automatically (free translator, no API key).');
+      showMeaning(meaning);
     } catch (error) {
       setAiStatus(error.message || 'Failed to translate this word.');
     } finally {
@@ -185,23 +196,11 @@ export function WordForm({
 
   function handleSubmit(event) {
     event.preventDefault();
-    const term = language.normalizeTerm(values.term).trim();
-    const normalizedValues = {
-      ...values,
-      term,
-      romaji: language.code === 'ja' ? (readingsRef.current[term] ?? kanaToRomaji(term)) : '',
-    };
+    const normalizedValues = toWordValues(values, readingsRef.current);
     const nextErrors = validateWordInput(normalizedValues);
     if (nextErrors.meaning && aiLoading) nextErrors.meaning = 'The meaning is still being looked up. Wait a moment, then try again.';
-    if (!nextErrors.term) {
-      const duplicate = findDuplicate?.(normalizedValues.term, normalizedValues.meaningLanguage);
-      if (duplicate) {
-        const target = getLanguage(normalizedValues.meaningLanguage).label;
-        nextErrors.term = duplicate.meaning
-          ? `"${duplicate.term}" already has a ${target} meaning: "${duplicate.meaning}". Choose another meaning language or edit that one.`
-          : `"${duplicate.term}" already has a ${target} entry. Choose another meaning language or edit that one.`;
-      }
-    }
+    const duplicate = nextErrors.term ? null : findDuplicate?.(normalizedValues.term, normalizedValues.meaningLanguage);
+    if (duplicate) nextErrors.term = duplicateWordMessage(duplicate, normalizedValues.meaningLanguage);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       (nextErrors.term ? termRef : meaningRef).current?.focus();
@@ -235,7 +234,13 @@ export function WordForm({
   return (
     <form className={className} onSubmit={handleSubmit} noValidate>
       <div className="row g-3">
-        <TextField className="col-md-6" label="Word language" value={language.label} readOnly hint="Set by the program." />
+        <TextField
+          className="col-md-6"
+          label="Word language"
+          value={kanjiMode ? `${language.label} (Kanji)` : language.label}
+          readOnly
+          hint="Set by the program."
+        />
         <SelectField className="col-md-6" label="Meaning language" value={values.meaningLanguage} onChange={change('meaningLanguage')}>
           {meaningOptions.map((option) => (
             <option key={option.value} value={option.value}>
@@ -245,7 +250,19 @@ export function WordForm({
         </SelectField>
 
         <div className="col-12">
-          {language.ime ? (
+          {kanjiMode ? (
+            <KanjiWordFields
+              kanji={values.term}
+              kana={values.kana}
+              error={errors.term}
+              kanjiRef={termRef}
+              autoFocus={Boolean(onCancel)}
+              readingsRef={readingsRef}
+              onKanjiChange={setTerm}
+              onKanaChange={setKana}
+              onComposingChange={setComposing}
+            />
+          ) : language.ime ? (
             <ImeTextField
               key="ime"
               {...termProps}
@@ -271,7 +288,7 @@ export function WordForm({
               ))}
             </datalist>
           ) : null}
-          <CharPalette chars={language.chars} onInsert={insertChar} label={`${language.label} characters`} />
+          {kanjiMode ? null : <CharPalette chars={language.chars} onInsert={insertChar} label={`${language.label} characters`} />}
         </div>
 
         <div className="col-12">

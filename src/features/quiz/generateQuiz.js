@@ -10,8 +10,8 @@ function pickSide(word, direction) {
     : { prompt: word.meaning, answer: word.term };
 }
 
-/** The fields needed to show a Japanese word's kana reading and romaji. */
-const readingOf = (word) => ({ id: word.id, term: word.term, wordLanguage: word.wordLanguage, romaji: word.romaji ?? '' });
+/** The fields needed to show (and read aloud) a Japanese word's kana reading and romaji. */
+const readingOf = (word) => ({ id: word.id, term: word.term, wordLanguage: word.wordLanguage, romaji: word.romaji ?? '', kana: word.kana ?? '' });
 
 /** Options are words when the answer is the word, so each can show its reading (Japanese). */
 function buildOptions(word, answer, direction, distractorPool, rng) {

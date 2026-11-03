@@ -26,6 +26,10 @@ const SOURCE_LABELS = {
  * `onComposingChange(boolean)` tells the parent while a word is still being typed.
  * `onReading(prefix, romaji, nextText)` reports the romaji typed for the part
  * that was just converted, so the parent can keep the reading of kanji.
+ * `candidateFilter(candidate)` keeps only some candidates (e.g. kana only).
+ * `suggestions` (with `suggestionsLabel`) is a list offered while the field has
+ * focus and nothing is being typed; ↑↓ then Enter, or a click, puts one in the
+ * field and calls `onSuggestion(suggestion)`.
  */
 export function ImeTextField({
   label,
@@ -38,7 +42,12 @@ export function ImeTextField({
   ref,
   onKeyDown,
   onBlur,
+  onFocus,
   service,
+  candidateFilter,
+  suggestions = [],
+  suggestionsLabel = 'Suggestions',
+  onSuggestion,
   className,
   ...inputProps
 }) {
@@ -52,6 +61,10 @@ export function ImeTextField({
   const [remote, setRemote] = useState({ romaji: '', candidates: [], source: 'local' });
   const [index, setIndex] = useState(0);
   const [dismissed, setDismissed] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1); // -1: none picked, so Enter still submits
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const suggestionsKey = suggestions.join('|');
 
   // Candidates for the word being typed: instant offline ones, then the online ones.
   useEffect(() => {
@@ -78,13 +91,21 @@ export function ImeTextField({
     onComposingChange?.(Boolean(romaji));
   }, [romaji, onComposingChange]);
 
+  // New suggestions are offered again, with none picked yet.
+  useEffect(() => {
+    setSuggestionIndex(-1);
+    setSuggestionsDismissed(false);
+  }, [suggestionsKey]);
+
   const offline = useMemo(() => (romaji ? candidateService.local(romaji) : []), [romaji, candidateService]);
   const online = remote.romaji === romaji ? remote : null;
-  const candidates = online ? online.candidates : offline;
+  const allCandidates = online ? online.candidates : offline;
+  const candidates = candidateFilter ? allCandidates.filter(candidateFilter) : allCandidates;
   const source = online ? online.source : 'local';
   const open = Boolean(romaji) && dismissed !== romaji;
   const listOpen = open && candidates.length > 0;
   const listId = `${id}-list`;
+  const suggesting = !romaji && focused && !suggestionsDismissed && suggestions.length > 0;
 
   function choose(candidate) {
     if (!composition || !candidate) return;
@@ -94,10 +115,38 @@ export function ImeTextField({
     setDismissed('');
   }
 
+  function suggest(suggestion) {
+    onValueChange(suggestion);
+    onSuggestion?.(suggestion);
+    setSuggestionsDismissed(true);
+  }
+
+  function handleSuggestionKey(event) {
+    const count = suggestions.length;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setSuggestionIndex((current) => (current + 1) % count);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setSuggestionIndex((current) => (current <= 0 ? count - 1 : current - 1));
+    } else if (event.key === 'Enter' && suggestionIndex >= 0) {
+      event.preventDefault();
+      suggest(suggestions[suggestionIndex]);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setSuggestionsDismissed(true);
+    }
+  }
+
   function handleKeyDown(event) {
     onKeyDown?.(event);
-    if (event.defaultPrevented || event.nativeEvent.isComposing || !listOpen) return;
+    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (suggesting) {
+      handleSuggestionKey(event);
+      return;
+    }
+    if (!listOpen) return;
 
     const count = candidates.length;
     if (event.key === 'ArrowDown' || event.key === ' ') {
@@ -120,6 +169,7 @@ export function ImeTextField({
 
   function handleBlur(event) {
     onBlur?.(event);
+    setFocused(false);
     const committed = commitRomaji(value);
     if (committed === value) return;
     if (composition) onReading?.(value.slice(0, composition.start), composition.romaji, committed);
@@ -146,11 +196,17 @@ export function ImeTextField({
           }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
+          onFocus={(event) => {
+            onFocus?.(event);
+            setFocused(true);
+          }}
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={listOpen}
-          aria-controls={listOpen ? listId : undefined}
-          aria-activedescendant={listOpen ? `${id}-opt-${index}` : undefined}
+          aria-expanded={listOpen || suggesting}
+          aria-controls={listOpen || suggesting ? listId : undefined}
+          aria-activedescendant={
+            listOpen ? `${id}-opt-${index}` : suggesting && suggestionIndex >= 0 ? `${id}-opt-${suggestionIndex}` : undefined
+          }
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={describedBy}
         />
@@ -177,6 +233,27 @@ export function ImeTextField({
                 ))}
               </ul>
             ) : null}
+          </div>
+        ) : suggesting ? (
+          <div className="ime" onMouseDown={(event) => event.preventDefault()}>
+            <div className="ime__head">
+              <span>{suggestionsLabel}</span>
+            </div>
+            <ul className="ime__list" id={listId} role="listbox" lang="ja">
+              {suggestions.map((suggestion, position) => (
+                <li
+                  key={suggestion}
+                  id={`${id}-opt-${position}`}
+                  role="option"
+                  aria-selected={position === suggestionIndex}
+                  className="ime__item"
+                  onClick={() => suggest(suggestion)}
+                >
+                  <span className="ime__num">{position + 1}</span>
+                  <span>{suggestion}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </div>

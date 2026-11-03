@@ -1,9 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 import { createWord } from '../../../features/vocabulary/model.js';
 import {
+  PROGRAM_LANGUAGE_OPTIONS,
   createProgram,
   initialProgramsState,
+  isKanjiProgram,
   levelOptionsFor,
+  parseProgramLanguage,
+  programLanguageLabel,
   programsReducer,
   sanitizeLevels,
   validateProgramLevels,
@@ -26,44 +30,9 @@ import {
   saveWords,
   storageUsage,
 } from '../../../features/vocabulary/storage.js';
+import { memoryStorage } from '../../helpers/memoryStorage.js';
 
 const EMPTY = { programs: [], wordsByProgram: {} };
-
-function fakeStorage(initial = {}) {
-  const data = { ...initial };
-  return {
-    data,
-    getItem: (key) => (key in data ? data[key] : null),
-    setItem: (key, value) => {
-      data[key] = value;
-    },
-    removeItem: (key) => {
-      delete data[key];
-    },
-  };
-}
-
-/** Like localStorage, including its size limit: a write that would pass `quota` characters throws. */
-function quotaStorage(quota, initial = {}) {
-  const data = new Map(Object.entries(initial));
-  const used = () => [...data].reduce((sum, [key, value]) => sum + key.length + value.length, 0);
-  return {
-    data,
-    get length() {
-      return data.size;
-    },
-    key: (index) => [...data.keys()][index] ?? null,
-    getItem: (key) => data.get(key) ?? null,
-    setItem: (key, value) => {
-      const next = used() - (data.has(key) ? key.length + data.get(key).length : 0) + key.length + String(value).length;
-      if (next > quota) throw new DOMException('Quota exceeded', 'QuotaExceededError');
-      data.set(key, String(value));
-    },
-    removeItem: (key) => {
-      data.delete(key);
-    },
-  };
-}
 
 /** State with the given programs added. */
 function stateWith(...programs) {
@@ -107,6 +76,64 @@ describe('validateProgramTarget', () => {
     const error = validateProgramTarget(value);
 
     expect(error).toMatch(/whole number from 1 to 100/);
+  });
+});
+
+describe('Japanese (Kanji) programs', () => {
+  it('should offer Japanese (Kanji) right after Japanese when a word language is chosen', () => {
+    const values = PROGRAM_LANGUAGE_OPTIONS.map((option) => option.value);
+
+    const position = values.indexOf('ja-kanji');
+
+    expect(position).toBe(values.indexOf('ja') + 1);
+  });
+
+  it.each([
+    ['ja-kanji', { wordLanguage: 'ja', script: 'kanji' }],
+    ['ja', { wordLanguage: 'ja', script: null }],
+    ['en', { wordLanguage: 'en', script: null }],
+  ])('should read %p as %j when the choice is parsed', (value, expected) => {
+    const parsed = parseProgramLanguage(value);
+
+    expect(parsed).toEqual(expected);
+  });
+
+  it('should be a Japanese program with JLPT levels when it is created', () => {
+    const program = createProgram('Kanji N5', 'ja', ['N5'], { script: 'kanji' });
+
+    expect(program).toMatchObject({ wordLanguage: 'ja', levels: ['N5'], script: 'kanji' });
+    expect(isKanjiProgram(program)).toBe(true);
+    expect(programLanguageLabel(program)).toBe('Japanese (Kanji)');
+  });
+
+  it.each([
+    ['a Japanese program', createProgram('A', 'ja'), 'Japanese'],
+    ['an English program asking for kanji', createProgram('B', 'en', [], { script: 'kanji' }), 'English'],
+  ])('should not be a kanji program when it is %s', (_, program, label) => {
+    const kanji = isKanjiProgram(program);
+
+    expect(kanji).toBe(false);
+    expect(program.script).toBeNull();
+    expect(programLanguageLabel(program)).toBe(label);
+  });
+
+  it('should keep its script when programs are saved and loaded', () => {
+    const storage = memoryStorage();
+    savePrograms([createProgram('Kanji', 'ja', ['N5'], { script: 'kanji' }), createProgram('Plain', 'ja')], storage);
+
+    const { programs } = loadPrograms(storage);
+
+    expect(programs.map((program) => program.script)).toEqual(['kanji', null]);
+  });
+
+  it('should drop the script when a stored non-Japanese program has one', () => {
+    const storage = memoryStorage({
+      [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'a', name: 'Odd', wordLanguage: 'en', script: 'kanji' }] }),
+    });
+
+    const { programs } = loadPrograms(storage);
+
+    expect(programs[0].script).toBeNull();
   });
 });
 
@@ -269,7 +296,7 @@ describe('programsReducer', () => {
 
 describe('saving and loading programs', () => {
   it("should save each program's words under its own key when programs are saved", () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     const [a, b] = [createProgram('A'), createProgram('B')];
 
     const saved = [
@@ -283,7 +310,7 @@ describe('saving and loading programs', () => {
   });
 
   it('should load the programs and their words back when they were saved', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     const [a, b] = [createProgram('A'), createProgram('B')];
     savePrograms([a, b], storage);
     saveWords([createWord({ term: 'cat' })], storage, programWordsKey(a.id));
@@ -297,7 +324,7 @@ describe('saving and loading programs', () => {
   });
 
   it('should leave the program empty when its stored words are removed', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     const program = createProgram('A');
     savePrograms([program], storage);
     saveWords([createWord({ term: 'cat' })], storage, programWordsKey(program.id));
@@ -309,7 +336,7 @@ describe('saving and loading programs', () => {
   });
 
   it('should restore the levels when programs are loaded', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     savePrograms([createProgram('N5', 'ja', ['N5', 'N4'])], storage);
 
     const { programs } = loadPrograms(storage);
@@ -318,7 +345,7 @@ describe('saving and loading programs', () => {
   });
 
   it('should restore the targets, with 100 for older programs, when programs are loaded', () => {
-    const storage = fakeStorage({
+    const storage = memoryStorage({
       [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'a', name: 'Old', wordLanguage: 'en' }] }),
     });
     const program = createProgram('New', 'en', [], { masteredLevel: 7, passedLevel: 9 });
@@ -331,7 +358,7 @@ describe('saving and loading programs', () => {
   });
 
   it('should drop invalid levels when the stored levels are damaged', () => {
-    const storage = fakeStorage({
+    const storage = memoryStorage({
       [PROGRAMS_KEY]: JSON.stringify({
         programs: [
           { id: 'a', name: 'Old', wordLanguage: 'en' },
@@ -349,7 +376,7 @@ describe('saving and loading programs', () => {
     const program = createProgram('Daily', 'en', ['A1']);
     const words = [createWord({ term: 'book', meaning: 'buku', meaningLanguage: 'id' }), createWord({ term: 'book', meaning: '本', meaningLanguage: 'ja' })];
     const state = programsReducer(stateWith(program), wordAction(program.id, { type: 'words/added', words }));
-    const storage = fakeStorage();
+    const storage = memoryStorage();
 
     saveWords(state.wordsByProgram[program.id], storage, programWordsKey(program.id));
     const saved = JSON.parse(decodeStored(storage.data[programWordsKey(program.id)])).words;
@@ -365,7 +392,7 @@ describe('replacing all stored programs (restoring a backup)', () => {
   const wordsFor = (count) => Array.from({ length: count }, (_, i) => createWord({ term: `w${i} ${Math.random()}`, meaning: `${Math.random()}` }));
 
   function storageWithOldData(quota) {
-    const storage = quotaStorage(quota, { other: 'kept' });
+    const storage = memoryStorage({ other: 'kept' }, { quota });
     const old = createProgram('Old');
     savePrograms([old], storage);
     saveWords(wordsFor(5), storage, programWordsKey(old.id));
@@ -382,8 +409,8 @@ describe('replacing all stored programs (restoring a backup)', () => {
     expect(result).toBe('saved');
     expect(loaded.programs.map((p) => p.name)).toEqual(['New']);
     expect(loaded.wordsByProgram[program.id]).toHaveLength(3);
-    expect(storage.data.has(programWordsKey(old.id))).toBe(false);
-    expect(storage.data.get('other')).toBe('kept');
+    expect(programWordsKey(old.id) in storage.data).toBe(false);
+    expect(storage.data.other).toBe('kept');
   });
 
   it('should reuse the space of the old data when the storage is nearly full', () => {
@@ -399,7 +426,7 @@ describe('replacing all stored programs (restoring a backup)', () => {
 
   it('should keep the old data when the new data does not fit', () => {
     const { storage, old } = storageWithOldData(3000);
-    const before = new Map(storage.data);
+    const before = { ...storage.data };
     const program = createProgram('Huge');
 
     const result = replaceStoredPrograms({ programs: [program], wordsByProgram: { [program.id]: wordsFor(500) } }, storage);
@@ -416,24 +443,24 @@ describe('replacing all stored programs (restoring a backup)', () => {
   });
 
   it("should count only this app's keys when storage usage is measured", () => {
-    const storage = quotaStorage(1e6, { other: 'x'.repeat(500) });
+    const storage = memoryStorage({ other: 'x'.repeat(500) }, { quota: 1e6 });
     savePrograms([createProgram('A')], storage);
 
     const used = storageUsage(storage);
 
-    expect(used).toBe(PROGRAMS_KEY.length + storage.data.get(PROGRAMS_KEY).length);
+    expect(used).toBe(PROGRAMS_KEY.length + storage.data[PROGRAMS_KEY].length);
   });
 });
 
 describe('app settings', () => {
   it('should be 100 for both targets when nothing is saved', () => {
-    const settings = loadSettings(fakeStorage());
+    const settings = loadSettings(memoryStorage());
 
     expect(settings).toEqual({ masteredLevel: 100, passedLevel: 100 });
   });
 
   it('should load the saved settings, within 1-100, when settings are saved', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
 
     const saved = saveSettings({ masteredLevel: 30, passedLevel: 0 }, storage);
 
@@ -442,7 +469,7 @@ describe('app settings', () => {
   });
 
   it('should use the defaults when the stored settings are damaged', () => {
-    const storage = fakeStorage({ [SETTINGS_KEY]: '{oops' });
+    const storage = memoryStorage({ [SETTINGS_KEY]: '{oops' });
 
     expect(loadSettings(storage)).toEqual({ masteredLevel: 100, passedLevel: 100 });
     expect(saveSettings({}, null)).toBe(false);
@@ -451,7 +478,7 @@ describe('app settings', () => {
 
 describe('migrating older data', () => {
   it('should take the language most of its words use when a program has no word language', () => {
-    const storage = fakeStorage({ [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'p', name: 'Old' }] }) });
+    const storage = memoryStorage({ [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'p', name: 'Old' }] }) });
     saveWords(
       [createWord({ term: 'ねこ', wordLanguage: 'ja' }), createWord({ term: 'いぬ', wordLanguage: 'ja' }), createWord({ term: 'cat', wordLanguage: 'en' })],
       storage,
@@ -465,7 +492,7 @@ describe('migrating older data', () => {
   });
 
   it('should save the inferred word language when programs are saved again', () => {
-    const storage = fakeStorage({ [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'p', name: 'Old' }] }) });
+    const storage = memoryStorage({ [PROGRAMS_KEY]: JSON.stringify({ programs: [{ id: 'p', name: 'Old' }] }) });
     saveWords([createWord({ term: 'ねこ', wordLanguage: 'ja' })], storage, programWordsKey('p'));
     const { programs } = loadPrograms(storage);
 
@@ -475,7 +502,7 @@ describe('migrating older data', () => {
   });
 
   it('should move the words into a "My words" program when they were saved before programs existed', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     saveWords([createWord({ term: 'old' })], storage, STORAGE_KEY);
 
     const { programs, wordsByProgram } = loadPrograms(storage);
@@ -485,7 +512,7 @@ describe('migrating older data', () => {
   });
 
   it('should make one program per language when legacy words use several languages', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     saveWords([createWord({ term: 'cat', wordLanguage: 'en' }), createWord({ term: 'ねこ', wordLanguage: 'ja' })], storage, STORAGE_KEY);
 
     const { programs, wordsByProgram } = loadPrograms(storage);
@@ -498,7 +525,7 @@ describe('migrating older data', () => {
   });
 
   it('should no longer read the legacy list when a program list is saved', () => {
-    const storage = fakeStorage();
+    const storage = memoryStorage();
     saveWords([createWord({ term: 'old' })], storage, STORAGE_KEY);
     savePrograms([], storage);
 
@@ -510,9 +537,9 @@ describe('migrating older data', () => {
 
 describe('damaged or blocked storage', () => {
   it.each([
-    ['empty storage', fakeStorage()],
+    ['empty storage', memoryStorage()],
     ['no storage at all', null],
-    ['a corrupt program list', fakeStorage({ [PROGRAMS_KEY]: '{oops' })],
+    ['a corrupt program list', memoryStorage({ [PROGRAMS_KEY]: '{oops' })],
   ])('should not crash when loadPrograms meets %s', (_, storage) => {
     const loaded = loadPrograms(storage);
 

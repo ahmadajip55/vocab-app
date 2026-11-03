@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { Button } from '../../components/Button.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
 import { getLanguage } from '../../languages/index.js';
-import { canSpeak, speak } from '../../lib/speech.js';
+import { ListenButton, SpeechSpeedToggle } from '../../components/ListenButton.jsx';
+import { useSpeech } from '../../hooks/useSpeech.js';
+import { readAloudText } from '../../languages/japanese/romaji.js';
 import { Flashcard } from './Flashcard.jsx';
 import {
   createFlashcardSession,
@@ -24,14 +26,17 @@ export function FlashcardSession({ deck, onResult, onRestart, onExit, onRomaji }
   const [shownMeaning, setShownMeaning] = useState(''); // the meaning on the current card's back
   const finished = isFlashcardSessionFinished(session);
   const current = finished ? null : byId.get(session.queue[session.index]);
+  const { play } = useSpeech();
+  const answer = useCallback(
+    (word, known) => {
+      onResult(word.id, known);
+      dispatch({ type: 'answered', known });
+    },
+    [onResult],
+  );
 
   useEffect(() => {
     if (!current) return undefined;
-
-    function answer(known) {
-      onResult(current.id, known);
-      dispatch({ type: 'answered', known });
-    }
 
     function onKeyDown(event) {
       const target = event.target;
@@ -40,19 +45,22 @@ export function FlashcardSession({ deck, onResult, onRestart, onExit, onRomaji }
 
       if (event.key === 'ArrowRight') {
         event.preventDefault();
-        answer(true);
+        answer(current, true);
       } else if (event.key === 'ArrowLeft') {
         event.preventDefault();
-        answer(false);
+        answer(current, false);
       } else if ((event.key === ' ' || event.key === 'Enter') && !target.closest?.('button, a')) {
         event.preventDefault();
         dispatch({ type: 'flipped' });
+      } else if (event.key === 'l' || event.key === 'L') {
+        event.preventDefault();
+        play(readAloudText(current), current.wordLanguage);
       }
     }
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [current, onResult]);
+  }, [current, answer, play]);
 
   if (finished) {
     const unknownWords = session.unknown.map((id) => byId.get(id));
@@ -82,11 +90,6 @@ export function FlashcardSession({ deck, onResult, onRestart, onExit, onRomaji }
     );
   }
 
-  const answer = (known) => {
-    onResult(current.id, known);
-    dispatch({ type: 'answered', known });
-  };
-
   return (
     <div className="vstack gap-3">
       <div className="d-flex align-items-center gap-3 small text-body-secondary">
@@ -107,20 +110,20 @@ export function FlashcardSession({ deck, onResult, onRestart, onExit, onRomaji }
 
       <div className="d-flex flex-wrap align-items-center gap-2">
         <Button onClick={() => dispatch({ type: 'flipped' })}>Flip card</Button>
-        {canSpeak ? (
-          <Button onClick={() => speak(current.term, getLanguage(current.wordLanguage).speech)} aria-label={`Listen to the pronunciation of ${current.term}`}>
-            Listen
-          </Button>
-        ) : null}
+        <ListenButton
+          word={current}
+          ariaLabel={`Listen to the pronunciation of ${current.term}`}
+        />
         {/* Only once the card is turned over, so it does not give the answer away. */}
-        {canSpeak && session.flipped && shownMeaning ? (
-          <Button
-            onClick={() => speak(shownMeaning, getLanguage(current.meaningLanguage).speech)}
-            aria-label={`Listen to the ${getLanguage(current.meaningLanguage).label} meaning: ${shownMeaning}`}
-          >
-            Listen to meaning ({getLanguage(current.meaningLanguage).label})
-          </Button>
+        {session.flipped && shownMeaning ? (
+          <ListenButton
+            text={shownMeaning}
+            language={current.meaningLanguage}
+            label={`Listen to meaning (${getLanguage(current.meaningLanguage).label})`}
+            ariaLabel={`Listen to the ${getLanguage(current.meaningLanguage).label} meaning: ${shownMeaning}`}
+          />
         ) : null}
+        <SpeechSpeedToggle />
         <Button variant="ghost" onClick={onExit}>
           Stop
         </Button>
@@ -128,19 +131,19 @@ export function FlashcardSession({ deck, onResult, onRestart, onExit, onRomaji }
 
       <div className="row g-2">
         <div className="col-6">
-          <Button variant="danger" className="btn-lg w-100" onClick={() => answer(false)}>
+          <Button variant="danger" className="btn-lg w-100" onClick={() => answer(current, false)}>
             Not mastered
           </Button>
         </div>
         <div className="col-6">
-          <Button variant="primary" className="btn-lg w-100" onClick={() => answer(true)}>
+          <Button variant="primary" className="btn-lg w-100" onClick={() => answer(current, true)}>
             Mastery
           </Button>
         </div>
       </div>
 
       <p className="small text-body-secondary d-flex flex-wrap align-items-center gap-1 mb-0">
-        <kbd>Space</kbd> flip · <kbd>←</kbd> not mastered · <kbd>→</kbd> mastery
+        <kbd>Space</kbd> flip · <kbd>←</kbd> not mastered · <kbd>→</kbd> mastery · <kbd>L</kbd> listen
       </p>
     </div>
   );

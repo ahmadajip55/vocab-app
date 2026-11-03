@@ -24,6 +24,7 @@ Everything runs in the browser. There is no server and no account: your data sta
 ### Programs
 
 - Create a program for each goal, with a name, a **word language** and one or more **levels**: CEFR (A1–C2), or JLPT (N5–N1) for Japanese. The word language cannot change later, so every word in a program uses the same one.
+- Choose **Japanese (Kanji)** for a program that focuses on kanji. Its words are added with three fields: kanji, kana reading and romaji (see [Japanese support](#japanese-support)). Everything else works as in a Japanese program.
 - Each program has its own **learning targets**, from 1 to 100 (default 100):
   - **Mastery target**: correct answers in a row needed to master a word.
   - **Quiz passed target**: correct quiz answers needed to pass a word.
@@ -47,6 +48,17 @@ Everything runs in the browser. There is no server and no account: your data sta
 - **Romaji input method**: type `benkyou` and pick 勉強, べんきょう or ベンキョウ from the list. Use Space or the arrow keys to move, Enter or 1–9 to choose, and Esc to close. Romaji left in the field becomes hiragana.
 - Every Japanese word shows its **kana reading and romaji**, for example 右 → みぎ · migi. A word with kanji and no saved reading is looked up once, then the reading is saved.
 - Imported romaji becomes kana, then kanji where there is one.
+- **Japanese (Kanji) programs** add words with three fields:
+
+  | Field | How it works |
+  | --- | --- |
+  | **Kanji** | Type romaji and pick the kanji. Picking it fills the kana. A kanji typed or pasted another way gets its reading looked up. |
+  | **Hiragana / Katakana** | Type romaji for hiragana, or pick katakana. Filling it first fills an empty kanji field with the usual spelling. |
+  | **Romaji** | Disabled, and always filled in from the kana. |
+
+  - **Dropdown suggestions:** while the kana is filled in, the kanji field suggests other spellings (せんせい → 先生, 先制, 宣誓…). While the kanji is filled in, the kana field suggests its readings in hiragana and katakana.
+  - **What is never replaced:** a field is only filled automatically while it is empty or still holds a value that was filled in automatically. Anything you typed or picked stays.
+  - **Saving:** the kana reading is saved with the word, katakana included. It is shown in the word list, on flashcards and in the quiz.
 
 ### Other languages
 
@@ -55,9 +67,9 @@ The word languages are English, Indonesian, Japanese, Spanish, German, French, I
 ### Flashcards
 
 - Choose the meaning language, whether to shuffle, and whether to show only words you have not mastered yet.
-- Flip the card, listen to the word or its meaning (using the browser's built-in speech), then choose **Mastery** or **Not mastered**.
+- Flip the card, listen to the word or its meaning (see [Listening](#listening)), then choose **Mastery** or **Not mastered**.
 - A correct answer adds one to the word's mastery, up to the program's target. A wrong answer resets it to 0.
-- Keyboard: Space or Enter flips, → means mastery, ← means not mastered.
+- Keyboard: Space or Enter flips, → means mastery, ← means not mastered, L reads the word aloud.
 
 ### Quiz
 
@@ -68,7 +80,19 @@ The word languages are English, Indonesian, Japanese, Spanish, German, French, I
   - In *meaning → word*, every option shows its kana reading and romaji.
   - Typed answers use the romaji input method.
 - Every correct quiz answer counts towards the word's **Passed** flag.
+- **Listening**:
+  - In *word → meaning*, the word can be heard while the question is shown.
+  - In *meaning → word*, it can be heard only after answering, so it does not give the answer away.
 - Keyboard: press 1–4 to choose an option.
+
+### Listening
+
+- **Where**: words are read aloud on flashcards (the word, and its meaning once the card is flipped), in the quiz, and from the speaker button next to every word in the word list.
+- **Voice**: speech uses the browser's built-in voices, so it needs no network. The app picks a voice for the word's language itself, preferring the same region and better-sounding voices. If the device has no voice for that language, the app says so instead of reading with the wrong voice.
+- **Japanese words** are read from their kana reading (食べる → たべる), because speech voices often misread kanji. A word with no known reading yet is read as written.
+- **Controls**:
+  - While a word plays, its button shows **Playing…**; press it again to stop.
+  - **Slow speech** reads at 70% speed. The choice is remembered on the device.
 
 ### Everything else
 
@@ -105,10 +129,12 @@ Then open the address Vite prints (usually http://localhost:5173).
 ### Data model
 
 ```text
-Program  { id, name, wordLanguage, levels, masteredLevel, passedLevel, createdAt }
-Word     { id, term, meaning, wordLanguage, meaningLanguage, romaji,
+Program  { id, name, wordLanguage, levels, masteredLevel, passedLevel, script, createdAt }
+Word     { id, term, meaning, wordLanguage, meaningLanguage, romaji, kana,
            mastery, quizPassed, attempts, correctCount, createdAt }
 ```
+
+`script` is `'kanji'` for a Japanese (Kanji) program and `null` otherwise. `romaji` and `kana` (the reading of a word with kanji) are used for Japanese only.
 
 A word's status is calculated from these fields and the program's targets:
 
@@ -149,10 +175,31 @@ The first row may be a header in any order. These names are recognised, in any l
 
 | Field | Header names |
 | --- | --- |
-| Word | Word, Term, Vocabulary, Vocab, Kata, Kosakata, English, Inggris |
+| Word | Word, Term, Vocabulary, Vocab, Kata, Kosakata, English, Inggris, Kanji |
 | Meaning | Meaning, Meaning result, Translation, Definition, Arti, Terjemahan, Indonesia, Indonesian, Definisi, Makna |
+| Kana (Japanese) | Kana, Hiragana, Katakana, Hiragana/Katakana, Reading, Furigana, Yomi, Yomigana, Bacaan, Cara baca |
+| Romaji (Japanese) | Romaji, Romanization, Romanisation, Romanisasi |
 
 Without a header, column A is the word and column B is its meaning.
+
+### Japanese (Kanji) programs
+
+- **Columns:** a file is read as **Kanji, Kana, Meaning**, and the template has those columns.
+- **Pasted text:** one `kanji, kana, meaning` line per word, for example:
+
+  ```text
+  勉強, べんきょう, study
+  日本, , Japan
+  日本, にほん
+  , みず, water
+  ```
+
+  Commas after the second stay in the meaning. A line with two parts is read as `kanji, kana` when the second part is kana, and as `kanji, meaning` otherwise.
+- **Filled in automatically:**
+  - A row with only a kana reading gets its usual kanji spelling.
+  - A row with kanji and no reading gets its reading looked up.
+  - Romaji always comes from the kana.
+- **Export:** the Excel export of a kanji program has Kanji, Kana, Romaji and Meaning columns.
 
 The meaning can be left blank. Blank meanings are translated into the chosen meaning language when the file is read or the pasted text is checked. For Japanese, romaji becomes kana and then kanji where there is one.
 
